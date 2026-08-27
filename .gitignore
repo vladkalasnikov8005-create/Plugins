@@ -6,6 +6,7 @@ out/
 # Готовые плагины - собираются из кода, хранить не надо
 # Каждый раз когда ты жмешь Build, jar пересоздается
 *.jar
+*.class
 !gradle/wrapper/gradle-wrapper.jar
 
 # IntelliJ IDEA - настройки у каждого свои

@@ -8,7 +8,7 @@ set -e
 echo "=== Сборка всех плагинов ==="
 echo ""
 
-for dir in Smakenchant Tactic dvarf guardianClassPlugin vampirest untitled; do
+for dir in Smakenchant Tactic dvarf guardianClassPlugin vampirest untitled LeperClass PalePlugin PetMonsters; do
   if [ -d "$dir" ]; then
     echo ">>> Собираю $dir..."
     cd "$dir"
