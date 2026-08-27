@@ -8,17 +8,17 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
 public final class MovementLock {
-    private final java.util.Map locks;
+    private final java.util.Map<java.util.UUID, org.examplee.leperClassPlugin.core.MovementLock$State> locks;
     private final org.bukkit.potion.PotionEffectType slow;
 
     public MovementLock(org.bukkit.potion.PotionEffectType slow) {
         super();
-        this.locks = new java.util.HashMap();
+        this.locks = new java.util.HashMap<>();
         this.slow = slow;
     }
 
     public void lock(org.bukkit.entity.Player p) {
-        org.examplee.leperClassPlugin.core.MovementLock$State st = (org.examplee.leperClassPlugin.core.MovementLock$State) locks.computeIfAbsent(p.getUniqueId(), x -> lambda$lock$0(p, x));
+        org.examplee.leperClassPlugin.core.MovementLock$State st = (org.examplee.leperClassPlugin.core.MovementLock$State) locks.computeIfAbsent(p.getUniqueId(), x -> lambda_lock_0(p, x));
         st.locks = st.locks + 1;
         p.setSprinting(false);
         p.setWalkSpeed(0.0F);
@@ -49,7 +49,7 @@ public final class MovementLock {
         }
     }
 
-    private static org.examplee.leperClassPlugin.core.MovementLock$State lambda$lock$0(org.bukkit.entity.Player p, java.util.UUID x) {
+    private static org.examplee.leperClassPlugin.core.MovementLock$State lambda_lock_0(org.bukkit.entity.Player p, java.util.UUID x) {
         return new org.examplee.leperClassPlugin.core.MovementLock$State(p.getWalkSpeed(), p.getFlySpeed());
     }
 

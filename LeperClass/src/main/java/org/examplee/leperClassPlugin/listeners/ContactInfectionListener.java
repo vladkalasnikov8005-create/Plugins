@@ -103,7 +103,7 @@ public final class ContactInfectionListener implements org.bukkit.event.Listener
         if (showScare) {
             if (!(pendingScare.containsKey(attacker.getUniqueId()))) {
                 attacker.sendMessage(org.examplee.leperClassPlugin.util.TextUtil.ui(java.lang.String.valueOf(org.bukkit.ChatColor.DARK_GREEN) + "Вы могли заразиться после контакта с прокаженным..."));
-                org.bukkit.scheduler.BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () -> lambda$onHitLeper$0(attacker, realInfection), plugin.settings.contactResolveTicks);
+                org.bukkit.scheduler.BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () -> lambda_onHitLeper_0(attacker, realInfection), plugin.settings.contactResolveTicks);
                 pendingScare.put(attacker.getUniqueId(), task);
             }
         }
@@ -124,7 +124,7 @@ public final class ContactInfectionListener implements org.bukkit.event.Listener
         return p;
     }
 
-    private void lambda$onHitLeper$0(org.bukkit.entity.Player attacker, boolean realInfection) {
+    private void lambda_onHitLeper_0(org.bukkit.entity.Player attacker, boolean realInfection) {
         pendingScare.remove(attacker.getUniqueId());
         if (!(attacker.isOnline())) {
             return;

@@ -41,7 +41,7 @@ public final class EffectBlockListener implements org.bukkit.event.Listener {
         if (ne != null) {
             if (plugin.effects.FIRE_RES != null) {
                 if (ne.getType().equals(plugin.effects.FIRE_RES)) {
-                    e.setCancelled(1);
+                    e.setCancelled(true);
                 }
             }
         }

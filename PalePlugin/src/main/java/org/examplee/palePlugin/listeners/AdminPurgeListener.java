@@ -22,7 +22,7 @@ public final class AdminPurgeListener implements org.bukkit.event.Listener {
             org.bukkit.inventory.ItemStack it = e.getItem();
             if (plugin.items.isAdminPurgeWand(it)) {
                 if (!(e.getPlayer().hasPermission("pale.admin"))) {
-                    e.setCancelled(1);
+                    e.setCancelled(true);
                     return;
                 }
             }
@@ -31,12 +31,12 @@ public final class AdminPurgeListener implements org.bukkit.event.Listener {
         it = e.getItem();
         if (plugin.items.isAdminPurgeWand(it)) {
             if (!(e.getPlayer().hasPermission("pale.admin"))) {
-                e.setCancelled(1);
+                e.setCancelled(true);
                 return;
             }
         }
         if (!(e.getPlayer().hasPermission("pale.admin"))) {
-            e.setCancelled(1);
+            e.setCancelled(true);
             return;
         }
         if (e.getClickedBlock() != null) {
@@ -44,7 +44,7 @@ public final class AdminPurgeListener implements org.bukkit.event.Listener {
         }
         org.bukkit.Location center = 0;
         plugin.purge.start(e.getPlayer(), center);
-        e.setCancelled(1);
+        e.setCancelled(true);
     }
 
 }

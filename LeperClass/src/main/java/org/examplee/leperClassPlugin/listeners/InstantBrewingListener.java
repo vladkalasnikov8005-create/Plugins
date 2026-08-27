@@ -25,7 +25,7 @@ public final class InstantBrewingListener implements org.bukkit.event.Listener {
             return;
         }
         org.bukkit.inventory.BrewerInventory inv = (org.bukkit.inventory.BrewerInventory) local3;
-        plugin.getServer().getScheduler().runTask(plugin, () -> lambda$onClick$0(inv));
+        plugin.getServer().getScheduler().runTask(plugin, () -> lambda_onClick_0(inv));
     }
 
     @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.NORMAL, ignoreCancelled = true)
@@ -35,7 +35,7 @@ public final class InstantBrewingListener implements org.bukkit.event.Listener {
             return;
         }
         org.bukkit.inventory.BrewerInventory inv = (org.bukkit.inventory.BrewerInventory) local3;
-        plugin.getServer().getScheduler().runTask(plugin, () -> lambda$onDrag$1(inv));
+        plugin.getServer().getScheduler().runTask(plugin, () -> lambda_onDrag_1(inv));
     }
 
     private void handle(org.bukkit.inventory.BrewerInventory inv) {
@@ -208,11 +208,11 @@ public final class InstantBrewingListener implements org.bukkit.event.Listener {
         return changed;
     }
 
-    private void lambda$onDrag$1(org.bukkit.inventory.BrewerInventory inv) {
+    private void lambda_onDrag_1(org.bukkit.inventory.BrewerInventory inv) {
         handle(inv);
     }
 
-    private void lambda$onClick$0(org.bukkit.inventory.BrewerInventory inv) {
+    private void lambda_onClick_0(org.bukkit.inventory.BrewerInventory inv) {
         handle(inv);
     }
 

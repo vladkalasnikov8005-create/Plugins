@@ -37,7 +37,7 @@ public final class ItemUseListener implements org.bukkit.event.Listener {
                 long now = java.lang.System.currentTimeMillis();
                 long last = ((java.lang.Long) lastSaltUse.getOrDefault(e.getPlayer().getUniqueId(), java.lang.Long.valueOf(0L))).longValue();
                 if (Long.compare(now - last, plugin.cfg.saltCooldownMs) < 0) {
-                    e.setCancelled(1);
+                    e.setCancelled(true);
                     return;
                 }
             }
@@ -48,14 +48,14 @@ public final class ItemUseListener implements org.bukkit.event.Listener {
             now = java.lang.System.currentTimeMillis();
             last = ((java.lang.Long) lastSaltUse.getOrDefault(e.getPlayer().getUniqueId(), java.lang.Long.valueOf(0L))).longValue();
             if (Long.compare(now - last, plugin.cfg.saltCooldownMs) < 0) {
-                e.setCancelled(1);
+                e.setCancelled(true);
                 return;
             }
         }
         now = java.lang.System.currentTimeMillis();
         last = ((java.lang.Long) lastSaltUse.getOrDefault(e.getPlayer().getUniqueId(), java.lang.Long.valueOf(0L))).longValue();
         if (Long.compare(now - last, plugin.cfg.saltCooldownMs) < 0) {
-            e.setCancelled(1);
+            e.setCancelled(true);
             return;
         }
         lastSaltUse.put(e.getPlayer().getUniqueId(), java.lang.Long.valueOf(now));
@@ -68,7 +68,7 @@ public final class ItemUseListener implements org.bukkit.event.Listener {
             plugin.spread.addCleansed(cleaned);
         }
         consumeOne(e.getPlayer(), item);
-        e.setCancelled(1);
+        e.setCancelled(true);
     }
 
     @org.bukkit.event.EventHandler
@@ -92,7 +92,7 @@ public final class ItemUseListener implements org.bukkit.event.Listener {
                     org.bukkit.block.Block clicked = e.getClickedBlock();
                     if (!(plugin.engine.infectedTypes().contains(clicked.getType()))) {
                         if (!(plugin.engine.hasInfectedNear(clicked))) {
-                            e.setCancelled(1);
+                            e.setCancelled(true);
                             return;
                         }
                     }
@@ -107,7 +107,7 @@ public final class ItemUseListener implements org.bukkit.event.Listener {
                 clicked = e.getClickedBlock();
                 if (!(plugin.engine.infectedTypes().contains(clicked.getType()))) {
                     if (!(plugin.engine.hasInfectedNear(clicked))) {
-                        e.setCancelled(1);
+                        e.setCancelled(true);
                         return;
                     }
                 }
@@ -119,7 +119,7 @@ public final class ItemUseListener implements org.bukkit.event.Listener {
             clicked = e.getClickedBlock();
             if (!(plugin.engine.infectedTypes().contains(clicked.getType()))) {
                 if (!(plugin.engine.hasInfectedNear(clicked))) {
-                    e.setCancelled(1);
+                    e.setCancelled(true);
                     return;
                 }
             }
@@ -127,7 +127,7 @@ public final class ItemUseListener implements org.bukkit.event.Listener {
         clicked = e.getClickedBlock();
         if (!(plugin.engine.infectedTypes().contains(clicked.getType()))) {
             if (!(plugin.engine.hasInfectedNear(clicked))) {
-                e.setCancelled(1);
+                e.setCancelled(true);
                 return;
             }
         }
@@ -143,7 +143,7 @@ public final class ItemUseListener implements org.bukkit.event.Listener {
             plugin.items.setPurifierFlintUses(item, usesLeft);
             e.getPlayer().playSound(e.getPlayer().getLocation(), org.bukkit.Sound.BLOCK_FIRE_EXTINGUISH, 0.699999988079071F, 1.2000000476837158F);
         }
-        e.setCancelled(1);
+        e.setCancelled(true);
     }
 
     @org.bukkit.event.EventHandler
@@ -161,7 +161,7 @@ public final class ItemUseListener implements org.bukkit.event.Listener {
         int r = plugin.items.getMapRadius(item);
         r = java.lang.Math.max(1, java.lang.Math.min(plugin.cfg.mapMaxRadiusChunks, r));
         plugin.engine.sendMap(e.getPlayer(), r);
-        e.setCancelled(1);
+        e.setCancelled(true);
     }
 
     @org.bukkit.event.EventHandler
@@ -174,7 +174,7 @@ public final class ItemUseListener implements org.bukkit.event.Listener {
                     long now = java.lang.System.currentTimeMillis();
                     long last = ((java.lang.Long) lastWandUse.getOrDefault(e.getPlayer().getUniqueId(), java.lang.Long.valueOf(0L))).longValue();
                     if (Long.compare(now - last, plugin.cfg.infectWandCooldownMs) < 0) {
-                        e.setCancelled(1);
+                        e.setCancelled(true);
                         return;
                     }
                 }
@@ -186,7 +186,7 @@ public final class ItemUseListener implements org.bukkit.event.Listener {
                     now = java.lang.System.currentTimeMillis();
                     last = ((java.lang.Long) lastWandUse.getOrDefault(e.getPlayer().getUniqueId(), java.lang.Long.valueOf(0L))).longValue();
                     if (Long.compare(now - last, plugin.cfg.infectWandCooldownMs) < 0) {
-                        e.setCancelled(1);
+                        e.setCancelled(true);
                         return;
                     }
                 }
@@ -201,7 +201,7 @@ public final class ItemUseListener implements org.bukkit.event.Listener {
                 now = java.lang.System.currentTimeMillis();
                 last = ((java.lang.Long) lastWandUse.getOrDefault(e.getPlayer().getUniqueId(), java.lang.Long.valueOf(0L))).longValue();
                 if (Long.compare(now - last, plugin.cfg.infectWandCooldownMs) < 0) {
-                    e.setCancelled(1);
+                    e.setCancelled(true);
                     return;
                 }
             }
@@ -213,7 +213,7 @@ public final class ItemUseListener implements org.bukkit.event.Listener {
                 now = java.lang.System.currentTimeMillis();
                 last = ((java.lang.Long) lastWandUse.getOrDefault(e.getPlayer().getUniqueId(), java.lang.Long.valueOf(0L))).longValue();
                 if (Long.compare(now - last, plugin.cfg.infectWandCooldownMs) < 0) {
-                    e.setCancelled(1);
+                    e.setCancelled(true);
                     return;
                 }
             }
@@ -224,14 +224,14 @@ public final class ItemUseListener implements org.bukkit.event.Listener {
             now = java.lang.System.currentTimeMillis();
             last = ((java.lang.Long) lastWandUse.getOrDefault(e.getPlayer().getUniqueId(), java.lang.Long.valueOf(0L))).longValue();
             if (Long.compare(now - last, plugin.cfg.infectWandCooldownMs) < 0) {
-                e.setCancelled(1);
+                e.setCancelled(true);
                 return;
             }
         }
         now = java.lang.System.currentTimeMillis();
         last = ((java.lang.Long) lastWandUse.getOrDefault(e.getPlayer().getUniqueId(), java.lang.Long.valueOf(0L))).longValue();
         if (Long.compare(now - last, plugin.cfg.infectWandCooldownMs) < 0) {
-            e.setCancelled(1);
+            e.setCancelled(true);
             return;
         }
         lastWandUse.put(e.getPlayer().getUniqueId(), java.lang.Long.valueOf(now));
@@ -261,7 +261,7 @@ public final class ItemUseListener implements org.bukkit.event.Listener {
         } else {
             plugin.items.setInfectWandUses(item, usesLeft);
         }
-        e.setCancelled(1);
+        e.setCancelled(true);
     }
 
     private void consumeOne(org.bukkit.entity.Player p, org.bukkit.inventory.ItemStack it) {

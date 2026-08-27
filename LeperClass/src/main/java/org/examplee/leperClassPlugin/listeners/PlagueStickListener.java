@@ -54,7 +54,7 @@ public final class PlagueStickListener implements org.bukkit.event.Listener {
                             return;
                         }
                     }
-                    e.setCancelled(1);
+                    e.setCancelled(true);
                     now = java.lang.System.currentTimeMillis();
                     if (Long.compare(now - ((java.lang.Long) rcCooldown.getOrDefault(p.getUniqueId(), java.lang.Long.valueOf(0L))).longValue(), 700L) < 0) {
                         return;
@@ -73,7 +73,7 @@ public final class PlagueStickListener implements org.bukkit.event.Listener {
                             return;
                         }
                     }
-                    e.setCancelled(1);
+                    e.setCancelled(true);
                     now = java.lang.System.currentTimeMillis();
                     if (Long.compare(now - ((java.lang.Long) rcCooldown.getOrDefault(p.getUniqueId(), java.lang.Long.valueOf(0L))).longValue(), 700L) < 0) {
                         return;
@@ -103,7 +103,7 @@ public final class PlagueStickListener implements org.bukkit.event.Listener {
                         return;
                     }
                 }
-                e.setCancelled(1);
+                e.setCancelled(true);
                 now = java.lang.System.currentTimeMillis();
                 if (Long.compare(now - ((java.lang.Long) rcCooldown.getOrDefault(p.getUniqueId(), java.lang.Long.valueOf(0L))).longValue(), 700L) < 0) {
                     return;
@@ -122,7 +122,7 @@ public final class PlagueStickListener implements org.bukkit.event.Listener {
                         return;
                     }
                 }
-                e.setCancelled(1);
+                e.setCancelled(true);
                 now = java.lang.System.currentTimeMillis();
                 if (Long.compare(now - ((java.lang.Long) rcCooldown.getOrDefault(p.getUniqueId(), java.lang.Long.valueOf(0L))).longValue(), 700L) < 0) {
                     return;
@@ -144,7 +144,7 @@ public final class PlagueStickListener implements org.bukkit.event.Listener {
                     return;
                 }
             }
-            e.setCancelled(1);
+            e.setCancelled(true);
             now = java.lang.System.currentTimeMillis();
             if (Long.compare(now - ((java.lang.Long) rcCooldown.getOrDefault(p.getUniqueId(), java.lang.Long.valueOf(0L))).longValue(), 700L) < 0) {
                 return;
@@ -163,7 +163,7 @@ public final class PlagueStickListener implements org.bukkit.event.Listener {
                     return;
                 }
             }
-            e.setCancelled(1);
+            e.setCancelled(true);
             now = java.lang.System.currentTimeMillis();
             if (Long.compare(now - ((java.lang.Long) rcCooldown.getOrDefault(p.getUniqueId(), java.lang.Long.valueOf(0L))).longValue(), 700L) < 0) {
                 return;
@@ -181,7 +181,7 @@ public final class PlagueStickListener implements org.bukkit.event.Listener {
                 return;
             }
         }
-        e.setCancelled(1);
+        e.setCancelled(true);
         now = java.lang.System.currentTimeMillis();
         if (Long.compare(now - ((java.lang.Long) rcCooldown.getOrDefault(p.getUniqueId(), java.lang.Long.valueOf(0L))).longValue(), 700L) < 0) {
             return;

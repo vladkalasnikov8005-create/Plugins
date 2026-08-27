@@ -40,7 +40,7 @@ public final class MobIgnoreListener implements org.bukkit.event.Listener {
             return;
         }
         if ((e.getEntity() instanceof org.bukkit.entity.Enemy)) {
-            e.setCancelled(1);
+            e.setCancelled(true);
         }
     }
 

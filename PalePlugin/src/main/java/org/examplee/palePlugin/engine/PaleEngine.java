@@ -53,15 +53,15 @@ public final class PaleEngine {
     }
 
     public org.examplee.palePlugin.store.SourceStore sources(org.bukkit.World w) {
-        return (org.examplee.palePlugin.store.SourceStore) sourcesByWorld.computeIfAbsent(w.getUID(), (java.util.UUID p0) -> org.examplee.palePlugin.engine.PaleEngine.lambda$sources$0(p0));
+        return (org.examplee.palePlugin.store.SourceStore) sourcesByWorld.computeIfAbsent(w.getUID(), (java.util.UUID p0) -> org.examplee.palePlugin.engine.PaleEngine.lambda_sources_0(p0));
     }
 
     public org.examplee.palePlugin.store.WardStore wards(org.bukkit.World w) {
-        return (org.examplee.palePlugin.store.WardStore) wardsByWorld.computeIfAbsent(w.getUID(), (java.util.UUID p0) -> org.examplee.palePlugin.engine.PaleEngine.lambda$wards$1(p0));
+        return (org.examplee.palePlugin.store.WardStore) wardsByWorld.computeIfAbsent(w.getUID(), (java.util.UUID p0) -> org.examplee.palePlugin.engine.PaleEngine.lambda_wards_1(p0));
     }
 
     public org.examplee.palePlugin.store.BiomeStore biomes(org.bukkit.World w) {
-        return (org.examplee.palePlugin.store.BiomeStore) biomeStoreByWorld.computeIfAbsent(w.getUID(), (java.util.UUID p0) -> org.examplee.palePlugin.engine.PaleEngine.lambda$biomes$2(p0));
+        return (org.examplee.palePlugin.store.BiomeStore) biomeStoreByWorld.computeIfAbsent(w.getUID(), (java.util.UUID p0) -> org.examplee.palePlugin.engine.PaleEngine.lambda_biomes_2(p0));
     }
 
     public java.util.Map wardsByWorld() {
@@ -292,31 +292,31 @@ public final class PaleEngine {
         if (!(n.contains("LOG"))) {
             if (!(n.contains("WOOD"))) {
                 if (n.contains("LEAVES")) {
-                    b.setType(org.bukkit.Material.AIR, 0);
+                    b.setType(org.bukkit.Material.AIR, false);
                 } else {
                     if (n.contains("MOSS")) {
                         if (n.contains("CARPET")) {
-                            b.setType(org.bukkit.Material.AIR, 0);
+                            b.setType(org.bukkit.Material.AIR, false);
                         } else {
-                            b.setType(org.bukkit.Material.DIRT, 0);
-                            b.setType(org.bukkit.Material.AIR, 0);
+                            b.setType(org.bukkit.Material.DIRT, false);
+                            b.setType(org.bukkit.Material.AIR, false);
                         }
                     } else {
-                        b.setType(org.bukkit.Material.AIR, 0);
+                        b.setType(org.bukkit.Material.AIR, false);
                     }
                 }
             }
         }
-        b.setType(org.bukkit.Material.AIR, 0);
+        b.setType(org.bukkit.Material.AIR, false);
         if (n.contains("MOSS")) {
             if (n.contains("CARPET")) {
-                b.setType(org.bukkit.Material.AIR, 0);
+                b.setType(org.bukkit.Material.AIR, false);
             } else {
-                b.setType(org.bukkit.Material.DIRT, 0);
-                b.setType(org.bukkit.Material.AIR, 0);
+                b.setType(org.bukkit.Material.DIRT, false);
+                b.setType(org.bukkit.Material.AIR, false);
             }
         } else {
-            b.setType(org.bukkit.Material.AIR, 0);
+            b.setType(org.bukkit.Material.AIR, false);
         }
         store.remove(b.getX(), b.getY(), b.getZ());
         return 1;
@@ -344,7 +344,7 @@ public final class PaleEngine {
                 } else {
                     if (infectedTypes().contains(t)) {
                     } else {
-                        cur.setType(mats.PALE_LOG, 0);
+                        cur.setType(mats.PALE_LOG, false);
                         applyInfectedBiome(cur, bs);
                         cur = cur.getRelative(org.bukkit.block.BlockFace.UP);
                         i++;
@@ -751,15 +751,15 @@ public final class PaleEngine {
         }
     }
 
-    private static org.examplee.palePlugin.store.BiomeStore lambda$biomes$2(java.util.UUID k) {
+    private static org.examplee.palePlugin.store.BiomeStore lambda_biomes_2(java.util.UUID k) {
         return new org.examplee.palePlugin.store.BiomeStore();
     }
 
-    private static org.examplee.palePlugin.store.WardStore lambda$wards$1(java.util.UUID k) {
+    private static org.examplee.palePlugin.store.WardStore lambda_wards_1(java.util.UUID k) {
         return new org.examplee.palePlugin.store.WardStore();
     }
 
-    private static org.examplee.palePlugin.store.SourceStore lambda$sources$0(java.util.UUID k) {
+    private static org.examplee.palePlugin.store.SourceStore lambda_sources_0(java.util.UUID k) {
         return new org.examplee.palePlugin.store.SourceStore();
     }
 
