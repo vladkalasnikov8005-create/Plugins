@@ -5,7 +5,7 @@ REM Нужна Java 21+ установленная на компе
 echo === Сборка всех плагинов ===
 echo.
 
-for %%D in (Smakenchant Tactic dvarf guardianClassPlugin vampirest untitled) do (
+for %%D in (Smakenchant Tactic dvarf guardianClassPlugin vampirest untitled LeperClass PalePlugin PetMonsters) do (
     if exist %%D (
         echo ^>^>^> Собираю %%D...
         cd %%D
