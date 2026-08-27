@@ -70,33 +70,28 @@ public final class ItemMigrationListener implements org.bukkit.event.Listener {
         org.bukkit.inventory.PlayerInventory inv = p.getInventory();
         int changed = 0;
         org.bukkit.inventory.ItemStack[] storage = inv.getStorageContents();
-        int i = 0;
-        if (i < storage.length) {
+        for (int i = 0; i < storage.length; i++) {
             org.bukkit.inventory.ItemStack old = storage[i];
             storage[i] = migrateItem(storage[i]);
             if (storage[i] != old) {
                 changed++;
             }
-            i++;
-            /* continue */
         }
         inv.setStorageContents(storage);
-        i = inv.getItemInOffHand();
-        old = migrateItem(inv.getItemInOffHand());
+        org.bukkit.inventory.ItemStack off = inv.getItemInOffHand();
+        org.bukkit.inventory.ItemStack oldOff = off;
+        off = migrateItem(off);
         inv.setItemInOffHand(off);
         if (off != oldOff) {
             changed++;
         }
         org.bukkit.inventory.ItemStack[] armor = inv.getArmorContents();
-        i = 0;
-        if (i < armor.length) {
-            old = armor[i];
+        for (int i = 0; i < armor.length; i++) {
+            org.bukkit.inventory.ItemStack old = armor[i];
             armor[i] = migrateItem(armor[i]);
             if (armor[i] != old) {
                 changed++;
             }
-            i++;
-            /* continue */
         }
         inv.setArmorContents(armor);
         if (changed > 0) {
@@ -108,6 +103,7 @@ public final class ItemMigrationListener implements org.bukkit.event.Listener {
         if (it != null) {
             int amount = it.getAmount();
             int version = itemVersion(it);
+            org.bukkit.inventory.ItemStack upgraded = null;
             if (version < 2) {
                 if (!(plugin.tags.isVaccine(it))) {
                     if (!(plugin.tags.isPlagueStick(it))) {
@@ -116,7 +112,7 @@ public final class ItemMigrationListener implements org.bukkit.event.Listener {
                                 if (!(plugin.tags.isThickLeperBlood(it))) {
                                     if (!(plugin.tags.isSterileLeperBlood(it))) {
                                         if (plugin.tags.isSacrificialKnife(it)) {
-                                            org.bukkit.inventory.ItemStack upgraded = plugin.items.makeSacrificialKnife();
+                                            upgraded = plugin.items.makeSacrificialKnife();
                                             upgraded.setAmount(amount);
                                             return upgraded;
                                         }

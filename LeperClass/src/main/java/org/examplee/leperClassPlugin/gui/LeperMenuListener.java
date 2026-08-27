@@ -32,8 +32,9 @@ public final class LeperMenuListener implements org.bukkit.event.Listener {
         }
         admin = (org.bukkit.entity.Player) target;
         target = org.bukkit.Bukkit.getPlayer(holder.getTarget());
+        int slot = 0;
         if (target != null) {
-            int slot = e.getRawSlot();
+            slot = e.getRawSlot();
             if (slot < 0) {
                 return;
             }
@@ -102,26 +103,28 @@ public final class LeperMenuListener implements org.bukkit.event.Listener {
         case 17:
             org.examplee.leperClassPlugin.util.InventoryUtil.giveOrDrop(target, plugin.items.makeUmbrellaTiny());
             break;
-            break;
         case 18:
             org.examplee.leperClassPlugin.util.InventoryUtil.giveOrDrop(target, plugin.items.makeUmbrellaWeak());
-            break;
             break;
         case 19:
             org.examplee.leperClassPlugin.util.InventoryUtil.giveOrDrop(target, plugin.items.makeUmbrellaNormal());
             break;
-            break;
         case 20:
             org.examplee.leperClassPlugin.util.InventoryUtil.giveOrDrop(target, plugin.items.makeUmbrellaStrong());
             break;
+        case 22:
             org.examplee.leperClassPlugin.util.InventoryUtil.giveOrDrop(target, plugin.items.makePlagueStick());
             break;
+        case 23:
             org.examplee.leperClassPlugin.util.InventoryUtil.giveOrDrop(target, plugin.items.makeSacrificialKnife());
             break;
+        case 24:
             org.examplee.leperClassPlugin.util.InventoryUtil.giveOrDrop(target, plugin.items.makePlagueBomb());
             break;
+        case 25:
             org.examplee.leperClassPlugin.util.InventoryUtil.giveOrDrop(target, plugin.items.makeLeperBlood());
             break;
+        case 26:
             org.examplee.leperClassPlugin.util.InventoryUtil.giveOrDrop(target, plugin.items.makeVaccine());
             break;
         case 21:

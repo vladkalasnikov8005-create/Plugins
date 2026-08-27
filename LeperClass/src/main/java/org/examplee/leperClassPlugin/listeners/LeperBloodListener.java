@@ -26,10 +26,12 @@ public final class LeperBloodListener implements org.bukkit.event.Listener {
 
     @org.bukkit.event.EventHandler
     public void onKnifeUse(org.bukkit.event.player.PlayerInteractEvent e) {
+        org.bukkit.entity.Player p = null;
+        org.bukkit.inventory.ItemStack hand = null;
         org.bukkit.event.block.Action a = e.getAction();
         if (a == org.bukkit.event.block.Action.RIGHT_CLICK_AIR) {
-            org.bukkit.entity.Player p = e.getPlayer();
-            org.bukkit.inventory.ItemStack hand = e.getItem();
+            p = e.getPlayer();
+            hand = e.getItem();
             if (hand == null) {
                 return;
             }
