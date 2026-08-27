@@ -1,0 +1,74 @@
+name: Build All Plugins
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Build Smakenchant
+        run: |
+          cd Smakenchant
+          chmod +x gradlew
+          ./gradlew build --no-daemon
+      - name: Build Tactic
+        run: |
+          cd Tactic
+          chmod +x gradlew
+          ./gradlew build --no-daemon
+      - name: Build dvarf (DwarvenCore)
+        run: |
+          cd dvarf
+          chmod +x gradlew
+          ./gradlew build --no-daemon
+      - name: Build guardianClassPlugin
+        run: |
+          cd guardianClassPlugin
+          chmod +x gradlew
+          ./gradlew build --no-daemon
+      - name: Build vampirest (VampireRace)
+        run: |
+          cd vampirest
+          chmod +x gradlew
+          ./gradlew build --no-daemon
+      - name: Build untitled
+        continue-on-error: true
+        run: |
+          cd untitled
+          chmod +x gradlew
+          ./gradlew build --no-daemon
+      - name: List all jars
+        run: |
+          find . -name "*.jar" -path "*/build/libs/*" -type f | sort
+          ls -lh Smakenchant/build/libs/ Tactic/build/libs/ dvarf/build/libs/ guardianClassPlugin/build/libs/ vampirest/build/libs/ || true
+      - name: Upload all plugins
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-plugins
+          path: |
+            Smakenchant/build/libs/*.jar
+            Tactic/build/libs/*.jar
+            dvarf/build/libs/*.jar
+            guardianClassPlugin/build/libs/*.jar
+            vampirest/build/libs/*.jar
+            untitled/build/libs/*.jar
+          if-no-files-found: warn
+      - name: Upload each plugin separately
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugins-separated
+          path: |
+            **/build/libs/*.jar
+
