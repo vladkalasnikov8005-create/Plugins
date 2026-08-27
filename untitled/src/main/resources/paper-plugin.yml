@@ -1,0 +1,6 @@
+name: untitled
+version: '${version}'
+
+main: org.examplee.untitled.Untitled
+api-version: '26.2'
+load: POSTWORLD
