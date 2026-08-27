@@ -49,10 +49,29 @@ jobs:
           cd untitled
           chmod +x gradlew
           ./gradlew build --no-daemon
+
+      - name: Build LeperClass
+        run: |
+          cd LeperClass
+          chmod +x gradlew
+          ./gradlew build --no-daemon
+
+      - name: Build PalePlugin
+        run: |
+          cd PalePlugin
+          chmod +x gradlew
+          ./gradlew build --no-daemon
+
+      - name: Build PetMonsters
+        run: |
+          cd PetMonsters
+          chmod +x gradlew
+          ./gradlew build --no-daemon
+
       - name: List all jars
         run: |
           find . -name "*.jar" -path "*/build/libs/*" -type f | sort
-          ls -lh Smakenchant/build/libs/ Tactic/build/libs/ dvarf/build/libs/ guardianClassPlugin/build/libs/ vampirest/build/libs/ || true
+          ls -lh Smakenchant/build/libs/ Tactic/build/libs/ dvarf/build/libs/ guardianClassPlugin/build/libs/ vampirest/build/libs/ LeperClass/build/libs/ PalePlugin/build/libs/ PetMonsters/build/libs/ || true
       - name: Upload all plugins
         uses: actions/upload-artifact@v4
         with:
@@ -64,6 +83,9 @@ jobs:
             guardianClassPlugin/build/libs/*.jar
             vampirest/build/libs/*.jar
             untitled/build/libs/*.jar
+            LeperClass/build/libs/*.jar
+            PalePlugin/build/libs/*.jar
+            PetMonsters/build/libs/*.jar
           if-no-files-found: warn
       - name: Upload each plugin separately
         uses: actions/upload-artifact@v4
@@ -71,4 +93,3 @@ jobs:
           name: plugins-separated
           path: |
             **/build/libs/*.jar
-
