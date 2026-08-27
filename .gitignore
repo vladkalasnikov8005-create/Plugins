@@ -1,0 +1,34 @@
+# Gradle - кэш и мусор от сборки, не надо хранить в GitHub
+.gradle/
+build/
+out/
+
+# Готовые плагины - собираются из кода, хранить не надо
+# Каждый раз когда ты жмешь Build, jar пересоздается
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# IntelliJ IDEA - настройки у каждого свои
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Логи и временные файлы
+*.log
+*.tmp
+*.bak
+
+# OS мусор
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Run-paper сервер (если запускал через IDEA)
+run/
+server/
+logs/
+world/
+world_nether/
+world_the_end/
