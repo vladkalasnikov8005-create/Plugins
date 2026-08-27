@@ -17,8 +17,8 @@ import org.examplee.leperClassPlugin.util.Compat;
 
 public final class UmbrellaManager {
     private final org.examplee.leperClassPlugin.LeperClassPlugin plugin;
-    private final java.util.Map remainingCache;
-    private final java.util.Map loreDisplayCache;
+    private final java.util.Map<java.util.UUID, java.lang.Integer> remainingCache;
+    private final java.util.Map<java.util.UUID, java.lang.Integer> loreDisplayCache;
 
     public UmbrellaManager(org.examplee.leperClassPlugin.LeperClassPlugin plugin) {
         super();
@@ -48,7 +48,7 @@ public final class UmbrellaManager {
             return;
         }
         java.util.UUID id = p.getUniqueId();
-        int remaining = ((java.lang.Integer) remainingCache.computeIfAbsent(id, x -> lambda$damageUmbrellaInOffhand$0(off, x))).intValue();
+        int remaining = ((java.lang.Integer) remainingCache.computeIfAbsent(id, x -> lambda_damageUmbrellaInOffhand_0(off, x))).intValue();
         remaining += 255;
         if (remaining <= 0) {
             remainingCache.remove(id);
@@ -74,11 +74,13 @@ public final class UmbrellaManager {
     }
 
     public void flushOffhand(org.bukkit.entity.Player p) {
+        org.bukkit.inventory.ItemStack off = null;
+        org.bukkit.inventory.meta.ItemMeta meta = null;
         java.lang.Integer remaining = (java.lang.Integer) remainingCache.get(p.getUniqueId());
         if (remaining != null) {
-            org.bukkit.inventory.ItemStack off = p.getInventory().getItemInOffHand();
+            off = p.getInventory().getItemInOffHand();
             if (plugin.tags.isUmbrella(off)) {
-                org.bukkit.inventory.meta.ItemMeta meta = off.getItemMeta();
+                meta = off.getItemMeta();
                 if (meta == null) {
                     return;
                 }
@@ -115,11 +117,8 @@ public final class UmbrellaManager {
     }
 
     public void flushAllOnline() {
-        java.util.Iterator local1 = org.bukkit.Bukkit.getOnlinePlayers().iterator();
-        if (local1.hasNext()) {
-            org.bukkit.entity.Player p = (org.bukkit.entity.Player) local1.next();
+        for (org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
             flushOffhand(p);
-            /* continue */
         }
     }
 
@@ -145,11 +144,12 @@ public final class UmbrellaManager {
     }
 
     private void updateUmbrellaLore(org.bukkit.inventory.ItemStack it, int remaining) {
+        org.bukkit.inventory.meta.ItemMeta meta = null;
         if (it == null) {
             return;
         }
         if (plugin.tags.isUmbrella(it)) {
-            org.bukkit.inventory.meta.ItemMeta meta = it.getItemMeta();
+            meta = it.getItemMeta();
             if (meta == null) {
                 return;
             }
@@ -190,7 +190,7 @@ public final class UmbrellaManager {
         return java.lang.String.format("%02d:%02d", tmp1);
     }
 
-    private java.lang.Integer lambda$damageUmbrellaInOffhand$0(org.bukkit.inventory.ItemStack off, java.util.UUID x) {
+    private java.lang.Integer lambda_damageUmbrellaInOffhand_0(org.bukkit.inventory.ItemStack off, java.util.UUID x) {
         return java.lang.Integer.valueOf(readRemainingFromItem(off));
     }
 

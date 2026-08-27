@@ -89,10 +89,10 @@ public final class LeperClassPlugin extends org.bukkit.plugin.java.JavaPlugin {
         if (umbrella != null) {
             umbrella.flushAllOnline();
         }
-        org.bukkit.Bukkit.getOnlinePlayers().forEach((org.bukkit.entity.Player p0) -> lambda$onDisable$0(p0));
+        org.bukkit.Bukkit.getOnlinePlayers().forEach((org.bukkit.entity.Player p0) -> lambda_onDisable_0(p0));
     }
 
-    private void lambda$onDisable$0(org.bukkit.entity.Player p) {
+    private void lambda_onDisable_0(org.bukkit.entity.Player p) {
         movementLock.release(p);
     }
 

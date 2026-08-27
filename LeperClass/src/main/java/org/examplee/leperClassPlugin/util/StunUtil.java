@@ -13,10 +13,10 @@ public final class StunUtil {
     public static void stun(org.examplee.leperClassPlugin.LeperClassPlugin plugin, org.bukkit.entity.Player p, int ticks) {
         plugin.movementLock.lock(p);
         java.util.UUID id = p.getUniqueId();
-        org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> lambda$stun$0(id, plugin), (long) ticks);
+        org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> lambda_stun_0(id, plugin), (long) ticks);
     }
 
-    private static void lambda$stun$0(java.util.UUID id, org.examplee.leperClassPlugin.LeperClassPlugin plugin) {
+    private static void lambda_stun_0(java.util.UUID id, org.examplee.leperClassPlugin.LeperClassPlugin plugin) {
         org.bukkit.entity.Player pl = org.bukkit.Bukkit.getPlayer(id);
         if (pl != null) {
             plugin.movementLock.unlock(pl);

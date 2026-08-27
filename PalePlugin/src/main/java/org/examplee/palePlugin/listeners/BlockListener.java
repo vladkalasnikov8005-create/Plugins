@@ -24,7 +24,7 @@ public final class BlockListener implements org.bukkit.event.Listener {
             if (plugin.items.isWard(e.getItemInHand())) {
                 if (!(e.getPlayer().hasPermission("pale.use"))) {
                     if (!(e.getPlayer().hasPermission("pale.admin"))) {
-                        e.setCancelled(1);
+                        e.setCancelled(true);
                         return;
                     }
                 }
@@ -38,7 +38,7 @@ public final class BlockListener implements org.bukkit.event.Listener {
         if (plugin.items.isWard(e.getItemInHand())) {
             if (!(e.getPlayer().hasPermission("pale.use"))) {
                 if (!(e.getPlayer().hasPermission("pale.admin"))) {
-                    e.setCancelled(1);
+                    e.setCancelled(true);
                     return;
                 }
             }

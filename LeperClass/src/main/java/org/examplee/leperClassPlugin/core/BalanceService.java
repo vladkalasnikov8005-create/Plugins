@@ -21,7 +21,7 @@ public final class BalanceService {
         }
         double max = 20.0;
         try {
-            org.bukkit.attribute.AttributeInstance attr = p.getAttribute(org.bukkit.attribute.Attribute.GENERIC_MAX_HEALTH);
+            org.bukkit.attribute.AttributeInstance attr = p.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
             if (attr != null) {
                 max = attr.getValue();
             }

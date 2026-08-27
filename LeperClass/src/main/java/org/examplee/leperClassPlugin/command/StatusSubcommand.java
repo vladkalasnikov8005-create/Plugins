@@ -38,11 +38,11 @@ public final class StatusSubcommand implements org.examplee.leperClassPlugin.com
             return java.util.List.of();
         }
         java.util.List out = new java.util.ArrayList();
-        org.bukkit.Bukkit.getOnlinePlayers().forEach(p -> lambda$tab$0(out, p));
+        org.bukkit.Bukkit.getOnlinePlayers().forEach(p -> lambda_tab_0(out, p));
         return out;
     }
 
-    private static void lambda$tab$0(java.util.List out, org.bukkit.entity.Player p) {
+    private static void lambda_tab_0(java.util.List out, org.bukkit.entity.Player p) {
         out.add(p.getName());
     }
 

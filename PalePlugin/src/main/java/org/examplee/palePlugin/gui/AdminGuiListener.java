@@ -24,7 +24,7 @@ public final class AdminGuiListener implements org.bukkit.event.Listener {
     @org.bukkit.event.EventHandler
     public void onClick(org.bukkit.event.inventory.InventoryClickEvent e) {
         if ("Pale: Admin".equals(e.getView().getTitle())) {
-            e.setCancelled(1);
+            e.setCancelled(true);
             org.bukkit.inventory.ItemStack it = e.getWhoClicked();
             if (!((it instanceof org.bukkit.entity.Player))) {
                 return;
@@ -32,7 +32,7 @@ public final class AdminGuiListener implements org.bukkit.event.Listener {
             org.bukkit.entity.Player p = (org.bukkit.entity.Player) it;
             return;
         }
-        e.setCancelled(1);
+        e.setCancelled(true);
         it = e.getWhoClicked();
         if (!((it instanceof org.bukkit.entity.Player))) {
             return;
@@ -376,7 +376,7 @@ public final class AdminGuiListener implements org.bukkit.event.Listener {
     @org.bukkit.event.EventHandler
     public void onDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
         if ("Pale: Admin".equals(e.getView().getTitle())) {
-            e.setCancelled(1);
+            e.setCancelled(true);
         }
     }
 

@@ -63,7 +63,7 @@ public final class ItemMigrationListener implements org.bukkit.event.Listener {
             return;
         }
         lastScan.put(p.getUniqueId(), java.lang.Long.valueOf(now));
-        plugin.getServer().getScheduler().runTask(plugin, () -> lambda$queueMigrate$0(p));
+        plugin.getServer().getScheduler().runTask(plugin, () -> lambda_queueMigrate_0(p));
     }
 
     private void migratePlayerNow(org.bukkit.entity.Player p) {
@@ -193,7 +193,7 @@ public final class ItemMigrationListener implements org.bukkit.event.Listener {
         return 0;
     }
 
-    private void lambda$queueMigrate$0(org.bukkit.entity.Player p) {
+    private void lambda_queueMigrate_0(org.bukkit.entity.Player p) {
         migratePlayerNow(p);
     }
 

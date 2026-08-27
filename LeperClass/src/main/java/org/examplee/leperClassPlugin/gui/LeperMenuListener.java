@@ -25,7 +25,7 @@ public final class LeperMenuListener implements org.bukkit.event.Listener {
             return;
         }
         org.examplee.leperClassPlugin.gui.LeperMenuHolder holder = (org.examplee.leperClassPlugin.gui.LeperMenuHolder) admin;
-        e.setCancelled(1);
+        e.setCancelled(true);
         org.bukkit.entity.Player target = e.getWhoClicked();
         if (!((target instanceof org.bukkit.entity.Player))) {
             return;
@@ -40,14 +40,14 @@ public final class LeperMenuListener implements org.bukkit.event.Listener {
             if (slot < e.getInventory().getSize()) {
                 if (slot != 11) {
                     if (slot == 15) {
-                        plugin.data.setLeper(target, 0);
+                        plugin.data.setLeper(target, false);
                         plugin.infection.cureDataOnly(target);
                         admin.sendMessage(java.lang.String.valueOf(org.bukkit.ChatColor.GREEN) + target.getName() + " больше не Прокаженный.");
                         plugin.menu.open(admin, target);
                         return;
                     }
                 }
-                plugin.data.setLeper(target, 1);
+                plugin.data.setLeper(target, true);
                 plugin.infection.cureDataOnly(target);
                 org.examplee.leperClassPlugin.util.EntityUtil.clearHostileTargets(target, 32.0);
                 admin.sendMessage(java.lang.String.valueOf(org.bukkit.ChatColor.GREEN) + target.getName() + " теперь Прокаженный.");
@@ -63,14 +63,14 @@ public final class LeperMenuListener implements org.bukkit.event.Listener {
         if (slot < e.getInventory().getSize()) {
             if (slot != 11) {
                 if (slot == 15) {
-                    plugin.data.setLeper(target, 0);
+                    plugin.data.setLeper(target, false);
                     plugin.infection.cureDataOnly(target);
                     admin.sendMessage(java.lang.String.valueOf(org.bukkit.ChatColor.GREEN) + target.getName() + " больше не Прокаженный.");
                     plugin.menu.open(admin, target);
                     return;
                 }
             }
-            plugin.data.setLeper(target, 1);
+            plugin.data.setLeper(target, true);
             plugin.infection.cureDataOnly(target);
             org.examplee.leperClassPlugin.util.EntityUtil.clearHostileTargets(target, 32.0);
             admin.sendMessage(java.lang.String.valueOf(org.bukkit.ChatColor.GREEN) + target.getName() + " теперь Прокаженный.");
@@ -79,20 +79,20 @@ public final class LeperMenuListener implements org.bukkit.event.Listener {
         }
         if (slot != 11) {
             if (slot == 15) {
-                plugin.data.setLeper(target, 0);
+                plugin.data.setLeper(target, false);
                 plugin.infection.cureDataOnly(target);
                 admin.sendMessage(java.lang.String.valueOf(org.bukkit.ChatColor.GREEN) + target.getName() + " больше не Прокаженный.");
                 plugin.menu.open(admin, target);
                 return;
             }
         }
-        plugin.data.setLeper(target, 1);
+        plugin.data.setLeper(target, true);
         plugin.infection.cureDataOnly(target);
         org.examplee.leperClassPlugin.util.EntityUtil.clearHostileTargets(target, 32.0);
         admin.sendMessage(java.lang.String.valueOf(org.bukkit.ChatColor.GREEN) + target.getName() + " теперь Прокаженный.");
         plugin.menu.open(admin, target);
         if (slot == 15) {
-            plugin.data.setLeper(target, 0);
+            plugin.data.setLeper(target, false);
             plugin.infection.cureDataOnly(target);
             admin.sendMessage(java.lang.String.valueOf(org.bukkit.ChatColor.GREEN) + target.getName() + " больше не Прокаженный.");
             plugin.menu.open(admin, target);

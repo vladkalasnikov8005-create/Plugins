@@ -21,7 +21,7 @@ public final class WardStore {
 
     public void add(int x, int y, int z) {
         long ck = org.examplee.palePlugin.store.SourceStore.packChunk(x >> 4, z >> 4);
-        ((java.util.ArrayList) byChunk.computeIfAbsent(java.lang.Long.valueOf(ck), (java.lang.Long p0) -> org.examplee.palePlugin.store.WardStore.lambda$add$0(p0))).add(new org.examplee.palePlugin.store.WardStore$Int3(x, y, z));
+        ((java.util.ArrayList) byChunk.computeIfAbsent(java.lang.Long.valueOf(ck), (java.lang.Long p0) -> org.examplee.palePlugin.store.WardStore.lambda_add_0(p0))).add(new org.examplee.palePlugin.store.WardStore$Int3(x, y, z));
         this.size = size + 1;
     }
 
@@ -105,7 +105,7 @@ public final class WardStore {
         return out;
     }
 
-    private static java.util.ArrayList lambda$add$0(java.lang.Long k) {
+    private static java.util.ArrayList lambda_add_0(java.lang.Long k) {
         return new java.util.ArrayList();
     }
 

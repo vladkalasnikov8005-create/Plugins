@@ -66,7 +66,7 @@ public final class WardsStorage {
         if (cfg == null) {
             this.cfg = new org.bukkit.configuration.file.YamlConfiguration();
         }
-        cfg.getKeys(false).forEach((java.lang.String p0) -> lambda$save$0(p0));
+        cfg.getKeys(false).forEach((java.lang.String p0) -> lambda_save_0(p0));
         java.io.IOException e = engine.wardsByWorld().entrySet().iterator();
         if (e.hasNext()) {
             java.util.Map.Entry entry = (java.util.Map.Entry) e.next();
@@ -82,7 +82,7 @@ public final class WardsStorage {
         }
     }
 
-    private void lambda$save$0(java.lang.String k) {
+    private void lambda_save_0(java.lang.String k) {
         cfg.set(k, null);
     }
 

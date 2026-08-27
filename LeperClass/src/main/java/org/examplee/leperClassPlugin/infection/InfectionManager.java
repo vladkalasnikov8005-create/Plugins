@@ -44,10 +44,12 @@ public final class InfectionManager {
     }
 
     public void checkProgression(org.bukkit.entity.Player p, long nowMs) {
+        int stage = 0;
+        java.lang.Long next = null;
         if (!(plugin.data.isLeper(p))) {
-            int stage = plugin.data.getInfectionStage(p);
+            stage = plugin.data.getInfectionStage(p);
             if (stage != 0) {
-                java.lang.Long next = plugin.data.getInfectionNextPhaseMs(p);
+                next = plugin.data.getInfectionNextPhaseMs(p);
                 if (next == null) {
                     return;
                 }
@@ -83,7 +85,7 @@ public final class InfectionManager {
         }
         if (stage == 2) {
             plugin.data.clearInfection(p);
-            plugin.data.setLeper(p, 1);
+            plugin.data.setLeper(p, true);
             if (plugin.effects.FIRE_RES != null) {
                 p.removePotionEffect(plugin.effects.FIRE_RES);
             }

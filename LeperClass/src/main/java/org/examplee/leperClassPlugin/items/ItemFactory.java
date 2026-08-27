@@ -35,7 +35,7 @@ public final class ItemFactory {
             tmp1[0] = org.bukkit.inventory.ItemFlag.HIDE_ATTRIBUTES;
             meta.addItemFlags(tmp1);
             markVersion(meta);
-            meta.getPersistentDataContainer().set(keys.plagueStickKey, org.bukkit.persistence.PersistentDataType.BYTE, java.lang.Byte.valueOf(1));
+            meta.getPersistentDataContainer().set(keys.plagueStickKey, org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
             it.setItemMeta(meta);
         }
         return it;
@@ -53,7 +53,7 @@ public final class ItemFactory {
             meta.setDisplayName(org.examplee.leperClassPlugin.util.TextUtil.gGreenGray("ОБЛАКО ПРОКАЗЫ"));
             meta.setLore(java.util.List.of(org.examplee.leperClassPlugin.util.TextUtil.loreHint("ПКМ: ядовитое облако и оглушение"), org.examplee.leperClassPlugin.util.TextUtil.loreWarn("Очаг и заражение только с благословлением Денжер")));
             markVersion(meta);
-            meta.getPersistentDataContainer().set(keys.plagueBombKey, org.bukkit.persistence.PersistentDataType.BYTE, java.lang.Byte.valueOf(1));
+            meta.getPersistentDataContainer().set(keys.plagueBombKey, org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
             it.setItemMeta(meta);
         }
         return it;
@@ -86,7 +86,7 @@ public final class ItemFactory {
             meta.setDisplayName(org.examplee.leperClassPlugin.util.TextUtil.gRedGray("ЖЕРТВЕННЫЙ НОЖИК"));
             meta.setLore(java.util.List.of(org.examplee.leperClassPlugin.util.TextUtil.loreHint("ПКМ: добыть кровь (только для прокаженного)"), java.lang.String.valueOf(org.bukkit.ChatColor.DARK_GRAY) + "• КД: 1 час"));
             markVersion(meta);
-            meta.getPersistentDataContainer().set(keys.sacrificialKnifeKey, org.bukkit.persistence.PersistentDataType.BYTE, java.lang.Byte.valueOf(1));
+            meta.getPersistentDataContainer().set(keys.sacrificialKnifeKey, org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
             it.setItemMeta(meta);
         }
         return it;
@@ -122,7 +122,7 @@ public final class ItemFactory {
             meta.setLore(java.util.Arrays.asList(tmp1));
             org.bukkit.persistence.PersistentDataContainer pdc = meta.getPersistentDataContainer();
             markVersion(meta);
-            pdc.set(keys.umbrellaKey, org.bukkit.persistence.PersistentDataType.BYTE, java.lang.Byte.valueOf(1));
+            pdc.set(keys.umbrellaKey, org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
             pdc.set(keys.umbrellaTierKey, org.bukkit.persistence.PersistentDataType.INTEGER, java.lang.Integer.valueOf(tier));
             pdc.set(keys.umbrellaLifetimeKey, org.bukkit.persistence.PersistentDataType.INTEGER, java.lang.Integer.valueOf(lifetimeSeconds));
             pdc.set(keys.umbrellaRemainingKey, org.bukkit.persistence.PersistentDataType.INTEGER, java.lang.Integer.valueOf(remaining));
@@ -182,7 +182,7 @@ public final class ItemFactory {
             }
             catch (java.lang.IllegalArgumentException ex) {
                 markVersion(meta);
-                meta.getPersistentDataContainer().set(key, org.bukkit.persistence.PersistentDataType.BYTE, java.lang.Byte.valueOf(1));
+                meta.getPersistentDataContainer().set(key, org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
                 it.setItemMeta(meta);
             }
         }

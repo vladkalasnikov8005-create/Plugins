@@ -42,7 +42,7 @@ public final class ConsumeListener implements org.bukkit.event.Listener {
                     if (type.isEdible()) {
                         if (!(org.examplee.leperClassPlugin.listeners.ConsumeListener.MEAT_AND_FISH.contains(type))) {
                             if (!(org.examplee.leperClassPlugin.listeners.ConsumeListener.GOLDEN_FOOD.contains(type))) {
-                                e.setCancelled(1);
+                                e.setCancelled(true);
                                 plugin.msg.error(p, "Прокаженные могут есть только мясо/рыбу и золотую еду.");
                                 return;
                             }
@@ -64,7 +64,7 @@ public final class ConsumeListener implements org.bukkit.event.Listener {
                 if (type.isEdible()) {
                     if (!(org.examplee.leperClassPlugin.listeners.ConsumeListener.MEAT_AND_FISH.contains(type))) {
                         if (!(org.examplee.leperClassPlugin.listeners.ConsumeListener.GOLDEN_FOOD.contains(type))) {
-                            e.setCancelled(1);
+                            e.setCancelled(true);
                             plugin.msg.error(p, "Прокаженные могут есть только мясо/рыбу и золотую еду.");
                             return;
                         }
@@ -78,7 +78,7 @@ public final class ConsumeListener implements org.bukkit.event.Listener {
             if (type.isEdible()) {
                 if (!(org.examplee.leperClassPlugin.listeners.ConsumeListener.MEAT_AND_FISH.contains(type))) {
                     if (!(org.examplee.leperClassPlugin.listeners.ConsumeListener.GOLDEN_FOOD.contains(type))) {
-                        e.setCancelled(1);
+                        e.setCancelled(true);
                         plugin.msg.error(p, "Прокаженные могут есть только мясо/рыбу и золотую еду.");
                         return;
                     }
@@ -89,17 +89,17 @@ public final class ConsumeListener implements org.bukkit.event.Listener {
         if (type.isEdible()) {
             if (!(org.examplee.leperClassPlugin.listeners.ConsumeListener.MEAT_AND_FISH.contains(type))) {
                 if (!(org.examplee.leperClassPlugin.listeners.ConsumeListener.GOLDEN_FOOD.contains(type))) {
-                    e.setCancelled(1);
+                    e.setCancelled(true);
                     plugin.msg.error(p, "Прокаженные могут есть только мясо/рыбу и золотую еду.");
                     return;
                 }
             }
         }
         if (plugin.effects.FIRE_RES != null) {
-            plugin.getServer().getScheduler().runTask(plugin, () -> lambda$onConsume$0(p));
+            plugin.getServer().getScheduler().runTask(plugin, () -> lambda_onConsume_0(p));
         }
         if (type == org.bukkit.Material.ROTTEN_FLESH) {
-            plugin.getServer().getScheduler().runTask(plugin, () -> lambda$onConsume$1(p));
+            plugin.getServer().getScheduler().runTask(plugin, () -> lambda_onConsume_1(p));
         }
         boolean poisonPotion = item.getItemMeta();
         if ((poisonPotion instanceof org.bukkit.inventory.meta.PotionMeta)) {
@@ -120,17 +120,17 @@ public final class ConsumeListener implements org.bukkit.event.Listener {
             }
             boolean healingPotion = false;
             if (poisonPotion) {
-                plugin.getServer().getScheduler().runTask(plugin, () -> lambda$onConsume$2(p));
+                plugin.getServer().getScheduler().runTask(plugin, () -> lambda_onConsume_2(p));
             }
             if (harmPotion) {
-                plugin.getServer().getScheduler().runTask(plugin, () -> lambda$onConsume$3(p));
+                plugin.getServer().getScheduler().runTask(plugin, () -> lambda_onConsume_3(p));
             }
             if (healingPotion) {
-                plugin.getServer().getScheduler().runTask(plugin, () -> lambda$onConsume$4(p));
+                plugin.getServer().getScheduler().runTask(plugin, () -> lambda_onConsume_4(p));
             }
             if (plugin.effects.FIRE_RES != null) {
                 if (potionHas(pm, "FIRE_RES")) {
-                    e.setCancelled(1);
+                    e.setCancelled(true);
                     plugin.msg.error(p, "Прокаженные не могут пить огнестойкость.");
                 }
             }
@@ -174,25 +174,25 @@ public final class ConsumeListener implements org.bukkit.event.Listener {
         return false;
     }
 
-    private void lambda$onConsume$4(org.bukkit.entity.Player p) {
+    private void lambda_onConsume_4(org.bukkit.entity.Player p) {
         plugin.balance.hurt(p, plugin.settings.leperDamageFromHeal);
         plugin.msg.error(p, "Для прокаженного это зелье обернулось болью.");
     }
 
-    private void lambda$onConsume$3(org.bukkit.entity.Player p) {
+    private void lambda_onConsume_3(org.bukkit.entity.Player p) {
         plugin.balance.heal(p, plugin.settings.leperHealFromHarm);
     }
 
-    private void lambda$onConsume$2(org.bukkit.entity.Player p) {
+    private void lambda_onConsume_2(org.bukkit.entity.Player p) {
         plugin.balance.heal(p, plugin.settings.leperHealFromPoison);
         p.removePotionEffect(org.bukkit.potion.PotionEffectType.POISON);
     }
 
-    private static void lambda$onConsume$1(org.bukkit.entity.Player p) {
+    private static void lambda_onConsume_1(org.bukkit.entity.Player p) {
         p.removePotionEffect(org.bukkit.potion.PotionEffectType.HUNGER);
     }
 
-    private void lambda$onConsume$0(org.bukkit.entity.Player p) {
+    private void lambda_onConsume_0(org.bukkit.entity.Player p) {
         p.removePotionEffect(plugin.effects.FIRE_RES);
     }
 

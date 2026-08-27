@@ -60,11 +60,11 @@ public final class AdminPurgeManager {
         long[] tmp1 = new long[1];
         tmp1[0] = 0L;
         dz = tmp1;
-        dx = org.bukkit.Bukkit.getScheduler().runTaskTimer(plugin, () -> lambda$start$0(q, w, cleanedTotal, p), 1L, 1L);
+        dx = org.bukkit.Bukkit.getScheduler().runTaskTimer(plugin, () -> lambda_start_0(q, w, cleanedTotal, p), 1L, 1L);
         tasksByPlayer.put(p.getUniqueId(), task);
     }
 
-    private void lambda$start$0(java.util.ArrayDeque q, org.bukkit.World w, long[] cleanedTotal, org.bukkit.entity.Player p) {
+    private void lambda_start_0(java.util.ArrayDeque q, org.bukkit.World w, long[] cleanedTotal, org.bukkit.entity.Player p) {
         int processed = 0;
         if (processed < plugin.cfg.adminPurgeChunksPerTick) {
             if (!(q.isEmpty())) {

@@ -133,7 +133,7 @@ public final class SpreadController {
         java.util.UUID wid = w.getUID();
         loadedChunkCountByWorld.put(wid, java.lang.Integer.valueOf(((java.lang.Integer) loadedChunkCountByWorld.getOrDefault(wid, java.lang.Integer.valueOf(0))).intValue() + 1));
         if (running) {
-            ((java.util.ArrayDeque) indexQueueByWorld.computeIfAbsent(wid, (java.util.UUID p0) -> org.examplee.palePlugin.tasks.SpreadController.lambda$onChunkLoad$0(p0))).addLast(new org.examplee.palePlugin.tasks.SpreadController$ChunkPos(cx, cz));
+            ((java.util.ArrayDeque) indexQueueByWorld.computeIfAbsent(wid, (java.util.UUID p0) -> org.examplee.palePlugin.tasks.SpreadController.lambda_onChunkLoad_0(p0))).addLast(new org.examplee.palePlugin.tasks.SpreadController$ChunkPos(cx, cz));
         }
     }
 
@@ -147,7 +147,7 @@ public final class SpreadController {
         if (local1.hasNext()) {
             org.bukkit.World world = (org.bukkit.World) local1.next();
             java.util.UUID wid = world.getUID();
-            java.util.ArrayDeque q = (java.util.ArrayDeque) indexQueueByWorld.computeIfAbsent(wid, (java.util.UUID p0) -> org.examplee.palePlugin.tasks.SpreadController.lambda$enqueueLoadedChunksForIndex$1(p0));
+            java.util.ArrayDeque q = (java.util.ArrayDeque) indexQueueByWorld.computeIfAbsent(wid, (java.util.UUID p0) -> org.examplee.palePlugin.tasks.SpreadController.lambda_enqueueLoadedChunksForIndex_1(p0));
             org.bukkit.Chunk[] local5 = world.getLoadedChunks();
             int local6 = local5.length;
             int local7 = 0;
@@ -163,7 +163,7 @@ public final class SpreadController {
 
     private void startSpreadTask() {
         stopSpreadTask();
-        this.spreadTask = org.bukkit.Bukkit.getScheduler().runTaskTimer(plugin, () -> lambda$startSpreadTask$2(), 1L, 1L);
+        this.spreadTask = org.bukkit.Bukkit.getScheduler().runTaskTimer(plugin, () -> lambda_startSpreadTask_2(), 1L, 1L);
     }
 
     private void stopSpreadTask() {
@@ -178,7 +178,7 @@ public final class SpreadController {
         if (plugin.cfg.indexChunksPerTickPerWorld <= 0) {
             return;
         }
-        this.indexTask = org.bukkit.Bukkit.getScheduler().runTaskTimer(plugin, () -> lambda$startIndexTask$3(), 1L, 1L);
+        this.indexTask = org.bukkit.Bukkit.getScheduler().runTaskTimer(plugin, () -> lambda_startIndexTask_3(), 1L, 1L);
     }
 
     private void stopIndexTask() {
@@ -240,7 +240,7 @@ public final class SpreadController {
 
     private void startPlayerEffectsTask() {
         stopPlayerEffectsTask();
-        this.playerEffectsTask = org.bukkit.Bukkit.getScheduler().runTaskTimer(plugin, () -> lambda$startPlayerEffectsTask$4(), 20L, (long) plugin.cfg.effectsCheckPeriodTicks);
+        this.playerEffectsTask = org.bukkit.Bukkit.getScheduler().runTaskTimer(plugin, () -> lambda_startPlayerEffectsTask_4(), 20L, (long) plugin.cfg.effectsCheckPeriodTicks);
     }
 
     private void stopPlayerEffectsTask() {
@@ -252,7 +252,7 @@ public final class SpreadController {
 
     private void startStepEffectsTask() {
         stopStepEffectsTask();
-        this.stepEffectsTask = org.bukkit.Bukkit.getScheduler().runTaskTimer(plugin, () -> lambda$startStepEffectsTask$5(), 10L, (long) plugin.cfg.stepEffectsCheckPeriodTicks);
+        this.stepEffectsTask = org.bukkit.Bukkit.getScheduler().runTaskTimer(plugin, () -> lambda_startStepEffectsTask_5(), 10L, (long) plugin.cfg.stepEffectsCheckPeriodTicks);
     }
 
     private void stopStepEffectsTask() {
@@ -294,7 +294,7 @@ public final class SpreadController {
         }
     }
 
-    private void lambda$startStepEffectsTask$5() {
+    private void lambda_startStepEffectsTask_5() {
         java.util.Iterator local1 = org.bukkit.Bukkit.getOnlinePlayers().iterator();
         if (local1.hasNext()) {
             org.bukkit.entity.Player p = (org.bukkit.entity.Player) local1.next();
@@ -325,7 +325,7 @@ public final class SpreadController {
         }
     }
 
-    private void lambda$startPlayerEffectsTask$4() {
+    private void lambda_startPlayerEffectsTask_4() {
         if (!(plugin.cfg.effectsEnabled)) {
             return;
         }
@@ -366,7 +366,7 @@ public final class SpreadController {
         }
     }
 
-    private void lambda$startIndexTask$3() {
+    private void lambda_startIndexTask_3() {
         if (!(running)) {
             return;
         }
@@ -398,7 +398,7 @@ public final class SpreadController {
         }
     }
 
-    private void lambda$startSpreadTask$2() {
+    private void lambda_startSpreadTask_2() {
         if (!(running)) {
             return;
         }
@@ -487,11 +487,11 @@ public final class SpreadController {
         }
     }
 
-    private static java.util.ArrayDeque lambda$enqueueLoadedChunksForIndex$1(java.util.UUID k) {
+    private static java.util.ArrayDeque lambda_enqueueLoadedChunksForIndex_1(java.util.UUID k) {
         return new java.util.ArrayDeque();
     }
 
-    private static java.util.ArrayDeque lambda$onChunkLoad$0(java.util.UUID k) {
+    private static java.util.ArrayDeque lambda_onChunkLoad_0(java.util.UUID k) {
         return new java.util.ArrayDeque();
     }
 

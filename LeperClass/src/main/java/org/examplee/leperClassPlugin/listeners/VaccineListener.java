@@ -30,7 +30,7 @@ public final class VaccineListener implements org.bukkit.event.Listener {
             if (used.getType() == org.bukkit.Material.POTION) {
                 org.bukkit.event.block.Action a = e.getAction();
                 if (a == org.bukkit.event.block.Action.RIGHT_CLICK_AIR) {
-                    e.setCancelled(1);
+                    e.setCancelled(true);
                     org.bukkit.entity.Player p = e.getPlayer();
                     if (plugin.data.isLeper(p)) {
                         p.sendMessage(org.examplee.leperClassPlugin.util.TextUtil.ui(java.lang.String.valueOf(org.bukkit.ChatColor.RED) + "Вам это уже не поможет. Вы - Прокаженный."));
@@ -38,7 +38,7 @@ public final class VaccineListener implements org.bukkit.event.Listener {
                     }
                 }
                 if (a == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
-                    e.setCancelled(1);
+                    e.setCancelled(true);
                     p = e.getPlayer();
                     if (plugin.data.isLeper(p)) {
                         p.sendMessage(org.examplee.leperClassPlugin.util.TextUtil.ui(java.lang.String.valueOf(org.bukkit.ChatColor.RED) + "Вам это уже не поможет. Вы - Прокаженный."));
@@ -52,7 +52,7 @@ public final class VaccineListener implements org.bukkit.event.Listener {
         if (used.getType() == org.bukkit.Material.POTION) {
             a = e.getAction();
             if (a == org.bukkit.event.block.Action.RIGHT_CLICK_AIR) {
-                e.setCancelled(1);
+                e.setCancelled(true);
                 p = e.getPlayer();
                 if (plugin.data.isLeper(p)) {
                     p.sendMessage(org.examplee.leperClassPlugin.util.TextUtil.ui(java.lang.String.valueOf(org.bukkit.ChatColor.RED) + "Вам это уже не поможет. Вы - Прокаженный."));
@@ -60,7 +60,7 @@ public final class VaccineListener implements org.bukkit.event.Listener {
                 }
             }
             if (a == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
-                e.setCancelled(1);
+                e.setCancelled(true);
                 p = e.getPlayer();
                 if (plugin.data.isLeper(p)) {
                     p.sendMessage(org.examplee.leperClassPlugin.util.TextUtil.ui(java.lang.String.valueOf(org.bukkit.ChatColor.RED) + "Вам это уже не поможет. Вы - Прокаженный."));
@@ -71,7 +71,7 @@ public final class VaccineListener implements org.bukkit.event.Listener {
         }
         a = e.getAction();
         if (a == org.bukkit.event.block.Action.RIGHT_CLICK_AIR) {
-            e.setCancelled(1);
+            e.setCancelled(true);
             p = e.getPlayer();
             if (plugin.data.isLeper(p)) {
                 p.sendMessage(org.examplee.leperClassPlugin.util.TextUtil.ui(java.lang.String.valueOf(org.bukkit.ChatColor.RED) + "Вам это уже не поможет. Вы - Прокаженный."));
@@ -79,14 +79,14 @@ public final class VaccineListener implements org.bukkit.event.Listener {
             }
         }
         if (a == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
-            e.setCancelled(1);
+            e.setCancelled(true);
             p = e.getPlayer();
             if (plugin.data.isLeper(p)) {
                 p.sendMessage(org.examplee.leperClassPlugin.util.TextUtil.ui(java.lang.String.valueOf(org.bukkit.ChatColor.RED) + "Вам это уже не поможет. Вы - Прокаженный."));
                 return;
             }
         }
-        e.setCancelled(1);
+        e.setCancelled(true);
         p = e.getPlayer();
         if (plugin.data.isLeper(p)) {
             p.sendMessage(org.examplee.leperClassPlugin.util.TextUtil.ui(java.lang.String.valueOf(org.bukkit.ChatColor.RED) + "Вам это уже не поможет. Вы - Прокаженный."));
