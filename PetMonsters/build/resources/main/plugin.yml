@@ -1,0 +1,47 @@
+name: PetMonsters
+version: '1.0.0'
+main: com.example.petmonsters.PetMonstersPlugin
+api-version: '1.21'
+description: Tame any mob and make it follow, defend or idle for a player.
+
+commands:
+  petsummon:
+    description: Teleport your pet to you
+    usage: /petsummon
+    permission: petmonsters.summon
+  petfree:
+    description: Release (untame) your pet
+    usage: /petfree
+    permission: petmonsters.free
+  petmode:
+    description: Change your pet's mode (idle/following/defense)
+    usage: /petmode <idle|following|defense>
+    permission: petmonsters.mode
+  petname:
+    description: Set your pet's name
+    usage: /petname <name>
+    permission: petmonsters.name
+  petscale:
+    description: Resize your pet (multiplier, 1.0 = original)
+    usage: /petscale <multiplier>
+    permission: petmonsters.scale
+
+permissions:
+  petmonsters.tame:
+    description: Allows taming mobs
+    default: true
+  petmonsters.summon:
+    description: Allows using /petsummon
+    default: true
+  petmonsters.free:
+    description: Allows using /petfree
+    default: true
+  petmonsters.mode:
+    description: Allows using /petmode
+    default: true
+  petmonsters.name:
+    description: Allows using /petname
+    default: true
+  petmonsters.scale:
+    description: Allows using /petscale
+    default: true

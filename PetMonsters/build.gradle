@@ -1,0 +1,32 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.example'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'papermc'
+        url = 'https://repo.papermc.io/repository/maven-public/'
+    }
+}
+
+dependencies {
+    compileOnly 'io.papermc.paper:paper-api:1.21.3-R0.1-SNAPSHOT'
+}
+
+java {
+    // Compile against Paper's Java 21 bytecode. The toolchain is off so
+    // the current JVM (any modern JDK) can build it.
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+processResources {
+    def props = [version: version]
+    inputs.properties props
+    expand props
+    filteringCharset = 'UTF-8'
+}

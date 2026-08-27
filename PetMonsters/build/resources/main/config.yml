@@ -1,0 +1,79 @@
+# ==========================================================
+#  PetMonsters configuration
+# ==========================================================
+#
+# universal-tame-item:
+#   If set, ANY mob can be tamed by interacting with this item.
+#   leave material as AIR to disable the universal item.
+#   If enabled, it acts as a fallback when the mob is not listed
+#   in taming-items below.
+#
+# taming-items:
+#   Map each mob (EntityType name) to a list of item materials that
+#   tame it. Example:
+#     ZOMBIE:
+#       - ROTTEN_FLESH
+#     SKELETON:
+#       - BONE
+#       - SUGAR
+#       - APPLE
+#
+# Messages support the following placeholders:
+#   {player}  - player name
+#   {pet}     - pet display name
+#   {mode}    - pet mode
+#
+# delay-seconds:
+#   Cooldown between taming attempts (in seconds).
+
+universal-tame-item:
+  enabled: false
+  material: AIR
+
+taming-items:
+  ZOMBIE:
+    - ROTTEN_FLESH
+  SKELETON:
+    - BONE
+  CREEPER:
+    - GUNPOWDER
+  SPIDER:
+    - FERMENTED_SPIDER_EYE
+  ENDERMAN:
+    - ENDER_PEARL
+  BLAZE:
+    - BLAZE_POWDER
+  WITHER_SKELETON:
+    - COAL
+  PIGLIN:
+    - GOLD_INGOT
+
+delay-seconds: 3
+
+# After a successful tame, open the rename gui (anvil) automatically
+auto-rename-gui: true
+
+# Visual/audio feedback (hearts, sounds, portal particles)
+effects:
+  tame: true          # hearts + success sound when taming
+  summon: true        # portal particles + teleport sound when summoning
+
+messages:
+  tamed: "&aYou tamed {pet}! You can now command it with /petmode, /petname."
+  already-have-pet: "&cYou can only tame one mob at a time. Free your current pet first with /petfree."
+  not-tameable: "&cThis mob cannot be tamed this way."
+  tamed-by-other: "&cThis mob is already tamed by {player}."
+  no-pet: "&cYou don't have a pet right now."
+  pet-not-found: "&cYour pet is out of range or missing. It will be summoned when it comes back."
+  pet-summoned: "&a{pet} has been summoned to you."
+  pet-freed: "&cYou released {pet}."
+  mode-changed: "&a{pet} is now in {mode} mode."
+  mode-usage: "&cUsage: /petmode <idle|following|defense>"
+  name-usage: "&cUsage: /petname <name>"
+  name-changed: "&a{pet}'s name changed."
+  cooldown: "&cYou must wait {time} seconds before taming again."
+  invalid-material: "&cInvalid material '{material}' in config for mob {mob}."
+  scale-usage: "&cUsage: /petscale <multiplier>  (1.0 = original size)"
+  scale-changed: "&a{pet} rescaled to {scale}x."
+  pet-respawned: "&aYour pet was lost, but {pet} has been recreated here."
+  pet-saved: "&aYour pet is safely stored. Use /petsummon to call it back."
