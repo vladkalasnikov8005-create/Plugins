@@ -1,0 +1,92 @@
+# ============================================
+#   Tactic Plugin (Minecraft 26.2)
+# ============================================
+
+mask-name: "????"
+mask-duration-seconds: 1800
+mask-name-color: "§7"
+
+mask-item-model-data:     1001
+shears-item-model-data:   1002
+dynamite-item-model-data: 1003
+fireball-item-model-data: 1004
+smoke-item-model-data:    1005
+grenade-item-model-data:  1006
+sticky-item-model-data:   1007
+hookah-item-model-data:   1008
+tobacco-item-model-data:  1009
+plow-item-model-data:     1010
+cigpack-item-model-data:  1011
+cig-item-model-data:      1012
+vaccine-item-model-data:  1013
+slobber-item-model-data:  1014
+hbow-item-model-data:     1016
+leash-item-model-data:    1017
+bonfire-item-model-data:  1018
+region-tool-model-data:   1019
+
+# === Ритуальный костёр ===
+# Сколько единиц топлива сжигается за один период (по умолчанию 1)
+bonfire-fuel-per-tick: 1
+# Период тика костра в тиках (20 тиков = 1 секунда; 100 = 5 сек)
+bonfire-tick-period-ticks: 100
+# Сколько топлива даёт каждый тип древесины:
+bonfire-fuel-log: 20      # брёвна/стволы/гифы (*_LOG, *_STEM, *_WOOD, *_HYPHAE)
+bonfire-fuel-plank: 5     # доски (*_PLANKS)
+bonfire-fuel-stick: 1     # палки (STICK)
+# Спавнить ли мобов от костра (охранники при горении, орда при угасании, Варден при просрочке grace)
+bonfire-spawn-mobs: true
+# Максимум топлива в костре
+bonfire-max-fuel: 100
+# Сколько секунд даётся на перезаправку потухшего костра (потом приходит Варден)
+bonfire-dead-grace-sec: 120
+# Сколько топлива остаётся в костре после прихода Вардена
+bonfire-warden-fuel: 10
+
+# === Дымовая шашка ===
+smoke-cloud-radius: 4              # радиус облака (блоков)
+smoke-cloud-height: 5              # высота облака (блоков)
+smoke-cloud-duration-ticks: 300    # время жизни облака (300 = 15 сек)
+smoke-cloud-particles-per-tick: 45 # частиц за тик (плотность дыма)
+smoke-blindness-sec: 4             # слепота внутри дыма (сек)
+smoke-slowness-sec: 5              # замедление внутри дыма (сек)
+smoke-slowness-level: 1            # уровень замедления (0 = I, 1 = II)
+smoke-place-range: 25.0            # макс. дистанция постановки дыма по лучу взгляда
+
+# === Липкая бомба ===
+sticky-fuse-ticks: 200             # фитиль после прилипания (200 = 10 сек)
+
+# === Кассетная граната ===
+cluster-tnt-count: 8               # на сколько мини-TNT распадается
+cluster-trigger-height: 20.0       # высота срабатывания над землёй (блоков)
+cluster-tnt-power: 2.5             # мощность каждой мини-TNT (обычная TNT = 4.0)
+cluster-tnt-fuse-ticks: 200        # страховочный фитиль мини-TNT (взрыв о землю раньше)
+
+# === Кальян и сигареты ===
+hookah-puffs: 5                    # тяжек на одну забивку табака
+hookah-cooldown-ticks: 30          # кулдаун между тяжками (30 = 1.5 сек)
+cig-smoke-ticks: 60                # длительность процесса курения сигареты (60 = 3 сек)
+
+# === Передозировка никотином ===
+nicotine-window-ms: 60000          # окно подсчёта затяжек (мс)
+nicotine-thresh-nausea: 3          # затяжек до тошноты
+nicotine-thresh-poison: 6          # затяжек до отравления
+nicotine-thresh-wither: 10         # затяжек до иссушения
+nicotine-thresh-death: 15          # затяжек до смерти
+
+# Вирус Мяуканья: глобальный тумблер распространения и симптомов
+meow-virus-enabled: true
+
+messages:
+  mask-activated: "§aВы надели маску! Ваш ник скрыт на 30 минут."
+  mask-expired: "§cВремя действия маски истекло — ваш ник восстановлен."
+  mask-removed-by-admin: "§cС вас досрочно сняли маску."
+  mask-torn-by-shears: "§cС вас сорвали маску ножницами!"
+  mask-torn-by-you: "§aВы сорвали маску!"
+  already-masked: "§eНа вас уже надета маска."
+  target-not-masked: "§eНа этом игроке нет маски."
+  player-not-found: "§cИгрок %player% не найден."
+  no-permission: "§cУ вас нет прав."
+  reloaded: "§aКонфиг перезагружен."
+  shears-on-non-masked: "§eНа этом игроке нет маски."
+  protected: "§cЭтого игрока невозможно разоблачить."
