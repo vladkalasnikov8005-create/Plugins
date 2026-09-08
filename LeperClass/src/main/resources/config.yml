@@ -1,0 +1,48 @@
+balance:
+  infection:
+    phase_minutes: 20
+  contact_infect_per_hp: 0.015
+  contact_fake_scare_chance: 0.20
+  contact_resolve_minutes: 20
+
+  knife:
+    cooldown_minutes: 60
+    fatigue_minutes: 5
+    weak_minutes: 10
+    slow_minutes: 10
+
+  sneeze:
+    cooldown_seconds: 10
+    velocity: 1.15
+    max_distance: 12
+    poison_seconds: 10
+    slow_seconds: 10
+    weak_seconds: 5
+    blind_seconds: 10
+
+  potion_inversion:
+    heal_from_poison: 6.0
+    heal_from_harm: 8.0
+    damage_from_heal: 6.0
+
+  # "Дом родной": прокажённый в бледном лесу (стадия чанка 2+) или рядом
+  # с бледными блоками (колонна ±vertical_range) не горит и получает регенерацию
+  pale_home:
+    enabled: true
+    min_stage: 2
+    vertical_range: 5
+    regen_amplifier: 0
+
+  # Смерть прокажённого заражает землю (нужен PalePlugin)
+  death_infect:
+    enabled: true
+    radius: 4
+    max_blocks: 150
+
+  # Карантинный фонарь: прокажённые в радиусе слабеют, заражение не прогрессирует.
+  # Топливо — светопыль (ПКМ по фонарю)
+  lantern:
+    radius: 16
+    fuel_per_dust_seconds: 300
+    fuel_max_seconds: 3600
+    start_fuel_seconds: 300
