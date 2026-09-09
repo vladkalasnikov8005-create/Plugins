@@ -1,0 +1,7 @@
+name: CustomDiscs
+version: '2.0.0'
+main: org.examplee.customdiscs.CustomDiscsPlugin
+bootstrapper: org.examplee.customdiscs.CustomDiscsBootstrap
+api-version: '26.2'
+authors: [vladkalasnikov8005]
+description: 'Свои пластинки под ключ: импорт песен из папки, автосборка текстурпака, свой трек в проигрывателе'
