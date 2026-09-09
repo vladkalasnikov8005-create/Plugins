@@ -14,9 +14,27 @@
 | **LeperClass** | Класс Прокаженного (заражение, чума, зонт, связь с PalePlugin) | 1.2.0 |
 | **PalePlugin** | Разрастание бледного леса, обереги, очищение | 1.2 |
 | **PetMonsters** | Приручение мобов, follow/defense/idle | 1.0.0 |
+| **CustomDiscs** | Свои пластинки под ключ: кидаешь mp3/ogg в папку — плагин сам конвертирует, рисует текстуру, собирает текстурпак и регистрирует трек в проигрывателе без датапаков | 2.0.0 |
 | **untitled** | Шаблон | - |
 
 `LeperClass` и `PalePlugin` связаны через `softdepend` (друг без друга грузятся, но заражение бледным лесом из лепры работает только если оба стоят).
+
+Подробнее про CustomDiscs — `CustomDiscs/README.md` (там установка, команды `/disc`, конфиг и разбор того, как это работает).
+
+## 🧹 Что лежит (и чего больше нет) в репе
+
+Только папки плагинов с исходниками + скрипты сборки. Всё остальное удалено:
+
+- `CustomDiscs-sources.zip`, `LEPALE.zip` — исходники внутри были дублями папок в репе, теперь просто лежат как обычные файлы
+- `KSEPSP-9.5.1-custom (4).zip` — это ресурс-пак (сборка ассетов), не код плагина; `CustomDiscs` собирает такие сам на сервере
+- `5e70a7000926f.mp3` — аудишка, кидается в `plugins/CustomDiscs/songs/` на сервере, в git не нужна
+- `LeperClass/org/**.class`, `LeperClass/META-INF/`, `PalePlugin/org/**.class`, `PalePlugin/META-INF/` — скомпилированные классы рядом с исходниками
+- `PetMonsters/build/` — вывод Gradle
+- `dvarf/CODE_DUMP.txt` — дамп структуры чужого проекта
+- `LeperClass/plugin.yml`, `LeperClass/config.yml` — устаревшие копии (актуальные в `LeperClass/src/main/resources/`)
+
+Заодно у `Tactic`, `LeperClass` и `PalePlugin` добавлены `gradlew` + `gradle/wrapper/gradle-wrapper.jar` — без них GitHub Actions падал, хотя шаг сборки этих плагинов в workflow был.
+
 
 ## 🚀 Как теперь собирать БЕЗ IDEA
 

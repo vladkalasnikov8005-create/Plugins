@@ -7,7 +7,33 @@ out/
 # Каждый раз когда ты жмешь Build, jar пересоздается
 *.jar
 *.class
+
+# Исключение: gradle-wrapper.jar НУЖЕН (он и позволяет собирать без установленной Gradle).
+# Паттерн с */, потому что проектов в репо несколько, и у каждого свой wrapper.
 !gradle/wrapper/gradle-wrapper.jar
+!*/gradle/wrapper/gradle-wrapper.jar
+
+# Архивы - исходники лежат в папках плагинов, зипки в репе не нужны
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+
+# Аудио и то, что CustomDiscs генерит/качает сам уже на сервере
+*.mp3
+*.ogg
+*.wav
+*.flac
+*.m4a
+CustomDiscs/bin/
+CustomDiscs/songs/
+
+# Мусор от IDEA рядом с исходниками (скомпилированные классы вне src/)
+# Паттерны только для корней проектов, чтобы не задеть legit ресурсы внутри src/main/resources/
+/*/META-INF/
+/*/org/examplee/
+/*/com/example/
 
 # IntelliJ IDEA - настройки у каждого свои
 .idea/
