@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"package": "org.examplee.plague.mixin",
+	"mixins": [
+		"MobTargetMixin",
+		"ExhaustionMixin"
+	],
+	"client": [],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

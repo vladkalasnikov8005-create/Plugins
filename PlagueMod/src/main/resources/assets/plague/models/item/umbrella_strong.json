@@ -1,0 +1,14 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "plague:item/umbrella_strong"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "plague:open": 1
+      },
+      "model": "plague:item/umbrella_strong_open"
+    }
+  ]
+}

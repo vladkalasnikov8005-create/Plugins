@@ -1,0 +1,27 @@
+{
+  "sneeze": {
+    "category": "player",
+    "subtitle": "subtitle.plague.sneeze",
+    "sounds": [{ "name": "plague:sneeze", "stream": false }]
+  },
+  "plague_hit": {
+    "category": "player",
+    "subtitle": "subtitle.plague.plague_hit",
+    "sounds": [{ "name": "plague:plague_hit", "stream": false }]
+  },
+  "dark_spread": {
+    "category": "block",
+    "subtitle": "subtitle.plague.dark_spread",
+    "sounds": [{ "name": "plague:dark_spread", "stream": false }]
+  },
+  "ward_chime": {
+    "category": "block",
+    "subtitle": "subtitle.plague.ward_chime",
+    "sounds": [{ "name": "plague:ward_chime", "stream": false }]
+  },
+  "conversion": {
+    "category": "player",
+    "subtitle": "subtitle.plague.conversion",
+    "sounds": [{ "name": "plague:conversion", "stream": false }]
+  }
+}
