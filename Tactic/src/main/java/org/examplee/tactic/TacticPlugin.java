@@ -19,12 +19,15 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockDropItemEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.*;
+import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
@@ -87,6 +90,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
 
     // === Сигареты ===
     private int                 CIG_SMOKE_TICKS     = 60;    // 3 сек на сам процесс курения (reloadCfg)
+    private static final int    CIG_PACK_SIZE       = 8;     // сигарет в одной пачке
     // Типы сигарет
     private static final int CIG_DIRT     = 0;   // Дешёвка/Самокрутка
     private static final int CIG_CLASSIC  = 1;   // Classic Red
@@ -194,9 +198,15 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
 
     // PDC
     private NamespacedKey keyMask, keyShears, keyDynamite, keyFireball, keySmoke, keyGrenade, keySticky, keyHookah, keyTobacco, keyPlow;
-    private NamespacedKey keyCigPack, keyCig, keyVaccine, keySlobber, keyHomingBow, keyLeash;
-    private NamespacedKey keyDynMode, keyGrenadeMode, keyStickyMode, keyTobaccoType, keyCigType, keyCigPackType, keyHomingMode;
+    private NamespacedKey keyCigPack, keyCig, keyVaccine, keySlobber, keyHomingBow, keyLeash, keyParsleyTea, keyOliveTea;
+    private NamespacedKey keyDynMode, keyGrenadeMode, keyStickyMode, keyTobaccoType, keyCigType, keyCigPackType, keyCigPackLeft, keyHomingMode;
     private NamespacedKey keyMeowStage;
+    // Персист маски на игроке (переживает рестарт)
+    private NamespacedKey keyMaskExpireAt;   // unix-ms когда маска истечёт
+    private NamespacedKey keyMaskOrigDisplay;
+    private NamespacedKey keyMaskOrigList;
+    // Алмазный прессинг: метка «чистого» (рафинированного) алмаза
+    private NamespacedKey keyPureDiamond;
     private NamespacedKey keyTntEntity, keyTntPower;
     private NamespacedKey keyFireballEntity;
     private NamespacedKey keySmokeEntity, keyGrenadeEntity, keyStickyEntity, keyStunEntity, keyFreezeEntity;
@@ -247,6 +257,8 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     // Состояние захвата цели самонаводящимся луком:
     //   targetId — UUID цели (игрок) или int entityId (моб), progress 0..HOMING_LOCK_TICKS, mode
     private final Map<UUID, HomingLock> homingLocks = new HashMap<>();
+    /** UUID самонаводящихся стрел — без getEntitiesByClass по всему миру каждый тик. */
+    private final Set<UUID> trackedHomingArrows = new HashSet<>();
     // Состояние связывания игроков поводком:
     //   leashTies  — кого на поводке у кого (хозяин → привязанный игрок + к чему привязан)
     //   leashBind  — устарело (оставлено на случай обратной совместимости); поводок вяжется МГНОВЕННО по ПКМ
@@ -298,7 +310,37 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     private int maskModelData, shearsModelData, dynModelData, fbModelData, smokeModelData, grenadeModelData,
                 stickyModelData, hookahModelData, tobaccoModelData, plowModelData,
                 cigPackModelData, cigModelData, vaccineModelData, slobberModelData,
-                hbowModelData, leashModelData, bonfireModelData, regionModelData;
+                hbowModelData, leashModelData, bonfireModelData, regionModelData, parsleyTeaModelData, oliveTeaModelData;
+
+    // === Гранёные алмазы ===
+    // Руда → негранёный алмаз. 6 негранёных + 1 бумага → 1 гранёный.
+    // Алмазные предметы крафтятся ТОЛЬКО из гранёных (как из ванильного алмаза раньше).
+    private boolean diamondHardEnabled = true;
+    /** Сколько негранёных алмазов нужно на 1 гранёный (плюс 1 бумага). */
+    private int diamondUncutPerCut = 6;
+    private NamespacedKey recipeCutDiamondKey;
+    private NamespacedKey recipeVanillaToUncutKey;
+
+    // === Админ-мод (/ad) ===
+    // survival-снапшот + admin-снапшот по UUID; в adMode — кто сейчас в админ-моде
+    private final Map<UUID, AdminSnap> adSurvival = new HashMap<>();
+    private final Map<UUID, AdminSnap> adAdminInv = new HashMap<>();
+    private final Set<UUID> adMode = new HashSet<>();
+
+    // === Maintenance (техработы) — отдельный вайтлист ===
+    private boolean maintenanceEnabled = false;
+    private String maintenanceKickMessage = "§c§lСервер на технических работах.";
+    /** Ники в нижнем регистре + UUID-строки, кому можно зайти при maintenance. */
+    private final Set<String> maintenanceWhitelist = new HashSet<>();
+
+    // === Защита Glad: чужие команды не могут целиться в игрока Glad ===
+    private boolean gladProtectEnabled = false;
+    private static final String GLAD_NAME = "Glad";
+
+    // === Оливковый чай: «Сеньория оливы» — аура мира до timestamp ms ===
+    private final Map<UUID, Long> oliveAuraUntil = new HashMap<>();
+    private static final double OLIVE_AURA_RADIUS = 8.0;
+    private static final long   OLIVE_AURA_MS     = 8L * 60L * 1000L; // 8 минут
 
     // Состояние вируса Мяуканья
     private boolean meowEnabled = true;
@@ -332,12 +374,21 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         keyTobacco        = new NamespacedKey(this, "tactic_tobacco");
         keyCigPack        = new NamespacedKey(this, "tactic_cig_pack");
         keyCig            = new NamespacedKey(this, "tactic_cig");
+        keyCigPackLeft    = new NamespacedKey(this, "tactic_cig_pack_left");
+        keyParsleyTea     = new NamespacedKey(this, "tactic_parsley_tea");
+        keyOliveTea       = new NamespacedKey(this, "tactic_olive_tea");
         keyVaccine        = new NamespacedKey(this, "tactic_vaccine");
         keySlobber        = new NamespacedKey(this, "tactic_slobber");
         keyHomingBow      = new NamespacedKey(this, "tactic_hbow");
         keyHomingMode     = new NamespacedKey(this, "tactic_hbow_mode");
         keyLeash          = new NamespacedKey(this, "tactic_leash");
         keyMeowStage      = new NamespacedKey(this, "tactic_meow_stage");
+        keyMaskExpireAt   = new NamespacedKey(this, "tactic_mask_expire");
+        keyMaskOrigDisplay= new NamespacedKey(this, "tactic_mask_odisp");
+        keyMaskOrigList   = new NamespacedKey(this, "tactic_mask_olist");
+        keyPureDiamond    = new NamespacedKey(this, "tactic_diamond_grade"); // 0=uncut, 1=cut
+        recipeCutDiamondKey = new NamespacedKey(this, "cut_diamond");
+        recipeVanillaToUncutKey = new NamespacedKey(this, "vanilla_to_uncut_diamond");
         keyStunGrenade    = new NamespacedKey(this, "tactic_stun_gren");
         keyDynMode        = new NamespacedKey(this, "tactic_dyn_mode");
         keyGrenadeMode    = new NamespacedKey(this, "tactic_grenade_mode");
@@ -380,10 +431,30 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         saveDefaultConfig();
         reloadCfg();
 
-        getCommand("tactic").setExecutor(this);
-        getCommand("tactic").setTabCompleter(this);
+        var tacticCmd = getCommand("tactic");
+        if (tacticCmd != null) {
+            tacticCmd.setExecutor(this);
+            tacticCmd.setTabCompleter(this);
+        } else {
+            getLogger().severe("Команда 'tactic' не найдена в plugin.yml!");
+        }
+        var regionCmd = getCommand("region");
+        if (regionCmd != null) {
+            regionCmd.setExecutor(this);
+            regionCmd.setTabCompleter(this);
+        } else {
+            getLogger().severe("Команда 'region' не найдена в plugin.yml!");
+        }
+        var adCmd = getCommand("ad");
+        if (adCmd != null) {
+            adCmd.setExecutor(this);
+            adCmd.setTabCompleter(this);
+        } else {
+            getLogger().severe("Команда 'ad' не найдена в plugin.yml!");
+        }
         getServer().getPluginManager().registerEvents(this, this);
         setupHideTeam();
+        registerDiamondRecipes();
 
         // Маску достаточно принудительно проверять раз в 10 тиков (0.5 сек) — сильно дешевле, чем каждый тик
         Bukkit.getScheduler().runTaskTimer(this, this::enforceMask, 10L, 10L);
@@ -396,8 +467,9 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         Bukkit.getScheduler().runTaskTimer(this, this::tickMeowInfect, MEOW_CHECK_PERIOD, MEOW_CHECK_PERIOD);
         Bukkit.getScheduler().runTaskTimer(this, this::tickMeowProgress, MEOW_PROGRESS_PERIOD, MEOW_PROGRESS_PERIOD);
         Bukkit.getScheduler().runTaskTimer(this, this::tickMeowEffects, 20L, 20L);
-        // Тик самонаводящегося лука: удержание цели + полёт стрел
-        Bukkit.getScheduler().runTaskTimer(this, this::tickHoming, 1L, 1L);
+        Bukkit.getScheduler().runTaskTimer(this, this::tickOliveAuraFx, 20L, 20L);
+        // Тик самонаводящегося лука: каждые 2 тика (не 1) — меньше нагрузка, полёт всё ещё плавный
+        Bukkit.getScheduler().runTaskTimer(this, this::tickHoming, 2L, 2L);
         // Тик поводка для игроков
         leashTaskId = Bukkit.getScheduler().runTaskTimer(this, this::tickLeash, 1L, 1L).getTaskId();
         // Тик ритуальных костров запускается/перезапускается в reloadCfg() с настраиваемым периодом
@@ -407,8 +479,13 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         Bukkit.getScheduler().runTaskTimer(this, this::tickFrozenBlocks, 20L, 20L);
         // Тик галлюцинаций (фейковые мобы)
         hallucinationTaskId = Bukkit.getScheduler().runTaskTimer(this, this::tickHallucinations, 5L, 5L).getTaskId();
-        // Загружаем стадию вируса из PDC игроков онлайн (при релоге)
-        Bukkit.getScheduler().runTaskLater(this, () -> { for (Player p : Bukkit.getOnlinePlayers()) loadMeowStage(p); }, 1L);
+        // Загружаем стадию вируса и маски из PDC игроков онлайн (при релоге/рестарте)
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                loadMeowStage(p);
+                restoreMaskFromPdc(p);
+            }
+        }, 1L);
         // Обновление карантинного меню каждые 20 тиков
         quarantineTaskId = Bukkit.getScheduler().runTaskTimer(this, this::refreshQuarantineMenu, 20L, 20L).getTaskId();
         // Тик территорий (actionbar при входе + чат с правилами); регионы уже загружены в reloadCfg()
@@ -435,12 +512,37 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
 
     @Override
     public void onDisable() {
+        // Выходим из админ-мода у всех онлайн — вернуть survival-инвентарь/GM
+        for (Player p : new ArrayList<>(Bukkit.getOnlinePlayers())) {
+            if (adMode.contains(p.getUniqueId())) {
+                try { exitAdminMode(p, false); } catch (Throwable t) {
+                    getLogger().warning("ad exit on disable: " + t.getMessage());
+                }
+            }
+        }
+        adMode.clear();
+        // survival/admin снапшоты можно оставить в памяти до GC — сервер гаснет
         // Отменяем таск обновления карантинного меню
         if (quarantineTaskId != -1) {
             Bukkit.getScheduler().cancelTask(quarantineTaskId);
             quarantineTaskId = -1;
         }
-        for (Player p : Bukkit.getOnlinePlayers()) if (isMasked(p)) removeMask(p, false, null);
+        // Снимаем визуал маски, но PDC (expire) оставляем — после рестарта restoreMaskFromPdc подхватит
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (!isMasked(p)) continue;
+            UUID uid = p.getUniqueId();
+            MaskData d = masked.get(uid);
+            // убеждаемся что expire в PDC актуален
+            if (p.getPersistentDataContainer().has(keyMaskExpireAt, PersistentDataType.LONG) && d != null) {
+                p.setDisplayName(d.origDisplay);
+                p.setPlayerListName(d.origList);
+                p.setCustomName(null);
+                Team tm = getHideTeam();
+                if (tm != null) tm.removeEntry(p.getName());
+            } else {
+                removeMask(p, false, null);
+            }
+        }
         masked.clear();
         expiryTasks.values().forEach(Bukkit.getScheduler()::cancelTask);
         expiryTasks.clear();
@@ -456,6 +558,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         overdoseDeaths.clear();
         hookahCooldown.clear();
         homingLocks.clear();
+        trackedHomingArrows.clear();
         // Сбрасываем всех привязанных на поводке (чтоб не висели частицы/скорость после рестарта)
         for (UUID uid : new ArrayList<>(leashTies.keySet())) {
             Player tied = Bukkit.getPlayer(uid);
@@ -472,6 +575,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         meowLastChat.clear();
         meowLastCough.clear();
         meowImmunityUntil.clear();
+        oliveAuraUntil.clear();
         // Закрываем все наши меню и очищаем трекеры
         for (Inventory inv : openMenus.values()) {
             try { inv.close(); } catch (Exception ignored) {}
@@ -762,6 +866,8 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         leashModelData  = getConfig().getInt("leash-item-model-data",    1017);
         bonfireModelData= getConfig().getInt("bonfire-item-model-data",  1018);
         regionModelData = getConfig().getInt("region-tool-model-data", 1019);
+        parsleyTeaModelData = getConfig().getInt("parsley-tea-item-model-data", 1020);
+        oliveTeaModelData   = getConfig().getInt("olive-tea-item-model-data", 1022);
         BONFIRE_FUEL_PER_TICK = getConfig().getInt("bonfire-fuel-per-tick", 1);
         BONFIRE_TICK_PERIOD   = Math.max(1, getConfig().getInt("bonfire-tick-period-ticks", 100)); // 100 тиков = 5 сек
         BONFIRE_LOG_FUEL      = getConfig().getInt("bonfire-fuel-log", 20);
@@ -772,6 +878,21 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         BONFIRE_DEAD_GRACE_SEC= Math.max(5, getConfig().getInt("bonfire-dead-grace-sec", 120));
         BONFIRE_WARDEN_FUEL   = Math.max(1, getConfig().getInt("bonfire-warden-fuel", 10));
         meowEnabled      = getConfig().getBoolean("meow-virus-enabled", true);
+        // === Гранёные алмазы ===
+        diamondHardEnabled = getConfig().getBoolean("diamond-hard-enabled", true);
+        diamondUncutPerCut = Math.max(1, Math.min(8, getConfig().getInt("diamond-uncut-per-cut", 6)));
+        // Maintenance
+        maintenanceEnabled = getConfig().getBoolean("maintenance-enabled", false);
+        maintenanceKickMessage = ChatColor.translateAlternateColorCodes('&',
+                getConfig().getString("maintenance-kick-message",
+                        "§c§lСервер на технических работах.\n§7Зайти могут только сотрудники."));
+        maintenanceWhitelist.clear();
+        for (String entry : getConfig().getStringList("maintenance-whitelist")) {
+            if (entry == null) continue;
+            String t = entry.trim();
+            if (!t.isEmpty()) maintenanceWhitelist.add(t.toLowerCase(java.util.Locale.ROOT));
+        }
+        gladProtectEnabled = getConfig().getBoolean("glad-protect-enabled", false);
         // Перезагружаем регионы из конфига (при /tactic reload изменения в regions.* подхватываются)
         regions.clear();
         loadRegionsFromConfig();
@@ -804,6 +925,8 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         // Перезапускаем тик костров с новым периодом
         if (bonfireTaskId != -1) Bukkit.getScheduler().cancelTask(bonfireTaskId);
         bonfireTaskId = Bukkit.getScheduler().runTaskTimer(this, this::tickBonfires, BONFIRE_TICK_PERIOD, BONFIRE_TICK_PERIOD).getTaskId();
+        // Перерегистрируем алмазные рецепты под новые числа из конфига
+        registerDiamondRecipes();
     }
 
     private String msg(String path) {
@@ -815,7 +938,8 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         Team t = sb.getTeam(TEAM_NAME);
         if (t == null) t = sb.registerNewTeam(TEAM_NAME);
         t.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.NEVER);
-        t.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
+        // ONLY hide nametag — collision must stay normal, иначе masked проходят сквозь друг друга
+        t.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.ALWAYS);
         t.setCanSeeFriendlyInvisibles(false);
     }
 
@@ -840,10 +964,13 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         p.setCustomName(maskColored);
         p.setCustomNameVisible(false);
         getHideTeam().addEntry(p.getName());
+        long expireAt = System.currentTimeMillis() + Math.max(1L, ticks) * 50L; // ticks → ms
+        saveMaskToPdc(p, expireAt);
+        long delay = Math.max(1L, (expireAt - System.currentTimeMillis()) / 50L);
         int id = Bukkit.getScheduler().runTaskLater(this, () -> {
             if (p.isOnline()) removeMask(p, true, RemoveReason.EXPIRED);
             else cleanupOffline(uid);
-        }, ticks).getTaskId();
+        }, delay).getTaskId();
         expiryTasks.put(uid, id);
         enforceMask();
     }
@@ -853,7 +980,10 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     private void removeMask(Player p, boolean cancelTask, RemoveReason reason) {
         UUID uid = p.getUniqueId();
         MaskData d = masked.remove(uid);
-        if (d == null) return;
+        if (d == null) {
+            clearMaskPdc(p);
+            return;
+        }
         if (cancelTask) { Integer t = expiryTasks.remove(uid); if (t != null) Bukkit.getScheduler().cancelTask(t); }
         else expiryTasks.remove(uid);
         p.setDisplayName(d.origDisplay);
@@ -862,6 +992,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         p.setCustomNameVisible(false);
         Team tm = getHideTeam();
         if (tm != null) tm.removeEntry(p.getName());
+        clearMaskPdc(p);
         if (reason != null) {
             switch (reason) {
                 case EXPIRED -> p.sendMessage(msg("mask-expired"));
@@ -875,6 +1006,61 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         masked.remove(uid);
         Integer t = expiryTasks.remove(uid);
         if (t != null) Bukkit.getScheduler().cancelTask(t);
+        // PDC чистится при следующем входе через restoreMaskFromPdc (expire check)
+        Player offline = Bukkit.getPlayer(uid);
+        if (offline != null) clearMaskPdc(offline);
+    }
+
+    /** Пишет expire + оригинальные ники в PDC игрока — маска переживает рестарт. */
+    private void saveMaskToPdc(Player p, long expireAtMs) {
+        var pdc = p.getPersistentDataContainer();
+        MaskData d = masked.get(p.getUniqueId());
+        pdc.set(keyMaskExpireAt, PersistentDataType.LONG, expireAtMs);
+        if (d != null) {
+            pdc.set(keyMaskOrigDisplay, PersistentDataType.STRING, d.origDisplay != null ? d.origDisplay : p.getName());
+            pdc.set(keyMaskOrigList, PersistentDataType.STRING, d.origList != null ? d.origList : p.getName());
+        }
+    }
+
+    private void clearMaskPdc(Player p) {
+        if (p == null) return;
+        var pdc = p.getPersistentDataContainer();
+        pdc.remove(keyMaskExpireAt);
+        pdc.remove(keyMaskOrigDisplay);
+        pdc.remove(keyMaskOrigList);
+    }
+
+    /** Восстанавливает маску из PDC после рестарта/релога. */
+    private void restoreMaskFromPdc(Player p) {
+        if (p == null || !p.isOnline()) return;
+        var pdc = p.getPersistentDataContainer();
+        if (!pdc.has(keyMaskExpireAt, PersistentDataType.LONG)) return;
+        long expireAt = pdc.getOrDefault(keyMaskExpireAt, PersistentDataType.LONG, 0L);
+        long now = System.currentTimeMillis();
+        if (expireAt <= now) {
+            clearMaskPdc(p);
+            return;
+        }
+        if (isMasked(p)) return; // уже в памяти
+        String od = pdc.getOrDefault(keyMaskOrigDisplay, PersistentDataType.STRING, p.getName());
+        String ol = pdc.getOrDefault(keyMaskOrigList, PersistentDataType.STRING, p.getName());
+        masked.put(p.getUniqueId(), new MaskData(od, ol));
+        long ticksLeft = Math.max(1L, (expireAt - now) / 50L);
+        // Не вызываем applyMask целиком — он перезаписал бы orig*; ставим визуал + таймер
+        p.setDisplayName(maskColored);
+        p.setPlayerListName(maskColored);
+        p.setCustomName(maskColored);
+        p.setCustomNameVisible(false);
+        getHideTeam().addEntry(p.getName());
+        Integer old = expiryTasks.remove(p.getUniqueId());
+        if (old != null) Bukkit.getScheduler().cancelTask(old);
+        UUID uid = p.getUniqueId();
+        int id = Bukkit.getScheduler().runTaskLater(this, () -> {
+            if (p.isOnline()) removeMask(p, true, RemoveReason.EXPIRED);
+            else cleanupOffline(uid);
+        }, ticksLeft).getTaskId();
+        expiryTasks.put(uid, id);
+        enforceMask();
     }
 
     private void enforceMask() {
@@ -1077,6 +1263,11 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
 
     // ==================== СИГАРЕТЫ И ПАЧКИ ====================
     private ItemStack buildCigPack(int amount, int type) {
+        return buildCigPack(amount, type, CIG_PACK_SIZE);
+    }
+
+    private ItemStack buildCigPack(int amount, int type, int left) {
+        left = Math.max(1, Math.min(CIG_PACK_SIZE, left));
         ItemStack it = new ItemStack(Material.PAPER, Math.max(1, amount));
         ItemMeta m = it.getItemMeta();
         String name, lore;
@@ -1092,16 +1283,48 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
             default          -> { type = CIG_DIRT; name = "📜 Дешёвка";
                 lore = ChatColor.GRAY + "Самокрутка. Яд в чистом виде."; }
         }
-        m.setDisplayName(ChatColor.WHITE + name);
+        m.setDisplayName(ChatColor.WHITE + name + ChatColor.DARK_GRAY + " ×" + left);
         m.setLore(List.of(
                 lore,
+                ChatColor.YELLOW + "Сигарет в пачке: " + left + "/" + CIG_PACK_SIZE,
                 ChatColor.DARK_GRAY + "ПКМ — достать сигарету"));
         m.setCustomModelData(cigPackModelData + type);
         m.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
         m.getPersistentDataContainer().set(keyCigPack, PersistentDataType.BYTE, (byte)1);
         m.getPersistentDataContainer().set(keyCigPackType, PersistentDataType.INTEGER, type);
+        m.getPersistentDataContainer().set(keyCigPackLeft, PersistentDataType.INTEGER, left);
         it.setItemMeta(m);
         return it;
+    }
+
+    private int getCigPackLeft(ItemStack s) {
+        if (!isCigPack(s)) return 0;
+        return s.getItemMeta().getPersistentDataContainer()
+                .getOrDefault(keyCigPackLeft, PersistentDataType.INTEGER, CIG_PACK_SIZE);
+    }
+
+    private void setCigPackLeft(ItemStack s, int left) {
+        if (!isCigPack(s)) return;
+        ItemMeta m = s.getItemMeta();
+        int type = m.getPersistentDataContainer().getOrDefault(keyCigPackType, PersistentDataType.INTEGER, CIG_DIRT);
+        left = Math.max(0, Math.min(CIG_PACK_SIZE, left));
+        m.getPersistentDataContainer().set(keyCigPackLeft, PersistentDataType.INTEGER, left);
+        // обновить имя/лор
+        String baseName;
+        String lore;
+        switch (type) {
+            case CIG_CLASSIC -> { baseName = "🚬 Classic Red"; lore = ChatColor.GRAY + "Классика. Сбивает голод и силы."; }
+            case CIG_MENTHOL -> { baseName = "❄ Menthol Light"; lore = ChatColor.GRAY + "Ментол. Слепит, но бодрит."; }
+            case CIG_GOLD    -> { baseName = "✨ Gold Filter"; lore = ChatColor.GRAY + "Дорогие. Лечат, но травят."; }
+            case CIG_CIGAR   -> { baseName = "🟫 Cigar Strong"; lore = ChatColor.GRAY + "Крепкая сигара. Сила и иссушение."; }
+            default          -> { baseName = "📜 Дешёвка"; lore = ChatColor.GRAY + "Самокрутка. Яд в чистом виде."; }
+        }
+        m.setDisplayName(ChatColor.WHITE + baseName + ChatColor.DARK_GRAY + " ×" + left);
+        m.setLore(List.of(
+                lore,
+                ChatColor.YELLOW + "Сигарет в пачке: " + left + "/" + CIG_PACK_SIZE,
+                ChatColor.DARK_GRAY + "ПКМ — достать сигарету"));
+        s.setItemMeta(m);
     }
 
     private ItemStack buildCigarette(int amount, int type) {
@@ -1329,6 +1552,8 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     private boolean isCigPack(ItemStack s)      { return s != null && s.getType() == Material.PAPER && s.hasItemMeta() && s.getItemMeta().getPersistentDataContainer().has(keyCigPack, PersistentDataType.BYTE); }
     private boolean isCigarette(ItemStack s)    { return s != null && s.getType() == Material.STICK && s.hasItemMeta() && s.getItemMeta().getPersistentDataContainer().has(keyCig, PersistentDataType.BYTE); }
     private boolean isVaccine(ItemStack s)      { return s != null && s.getType() == Material.POTION && s.hasItemMeta() && s.getItemMeta().getPersistentDataContainer().has(keyVaccine, PersistentDataType.BYTE); }
+    private boolean isParsleyTea(ItemStack s)   { return s != null && s.getType() == Material.POTION && s.hasItemMeta() && s.getItemMeta().getPersistentDataContainer().has(keyParsleyTea, PersistentDataType.BYTE); }
+    private boolean isOliveTea(ItemStack s)     { return s != null && s.getType() == Material.POTION && s.hasItemMeta() && s.getItemMeta().getPersistentDataContainer().has(keyOliveTea, PersistentDataType.BYTE); }
     private boolean isSlobber(ItemStack s)      { return s != null && s.getType() == Material.FERMENTED_SPIDER_EYE && s.hasItemMeta() && s.getItemMeta().getPersistentDataContainer().has(keySlobber, PersistentDataType.BYTE); }
     private boolean isHomingBow(ItemStack s)    { return s != null && s.getType() == Material.BOW && s.hasItemMeta() && s.getItemMeta().getPersistentDataContainer().has(keyHomingBow, PersistentDataType.BYTE); }
 
@@ -1345,7 +1570,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     private boolean isTacticItem(ItemStack s) {
         return isMask(s) || isShears(s) || isDynamite(s) || isFireballItem(s) || isSmokeItem(s)
                 || isGrenadeItem(s) || isStickyItem(s) || isHookahItem(s) || isTobaccoItem(s)
-                || isPlow(s) || isCigPack(s) || isCigarette(s) || isVaccine(s) || isSlobber(s)
+                || isPlow(s) || isCigPack(s) || isCigarette(s) || isVaccine(s) || isParsleyTea(s) || isOliveTea(s) || isSlobber(s)
                 || isStunGrenade(s) || isFreezeGrenade(s) || isHomingBow(s) || isLeashItem(s) || isBonfireItem(s) || isRegionTool(s);
     }
 
@@ -1459,6 +1684,99 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         return it;
     }
 
+    /** Легендарный напиток «Петрушевый чай». */
+    private ItemStack buildParsleyTea(int amount) {
+        ItemStack it = new ItemStack(Material.POTION, Math.max(1, amount));
+        ItemMeta m = it.getItemMeta();
+        m.setDisplayName(ChatColor.GREEN + "" + ChatColor.BOLD + "🌿 Петрушевый чай");
+        m.setLore(List.of(
+                ChatColor.GOLD + "" + ChatColor.ITALIC + "Легенда зелёных долин",
+                "",
+                ChatColor.DARK_GREEN + "В старых хрониках его звали",
+                ChatColor.GREEN + "«дыханием весны»" + ChatColor.DARK_GREEN + " — настоем,",
+                ChatColor.DARK_GREEN + "что варили лишь в ночь полной луны",
+                ChatColor.DARK_GREEN + "из отборной петрушки горных склонов,",
+                ChatColor.DARK_GREEN + "росы с серебряных листьев и капли",
+                ChatColor.DARK_GREEN + "воды из незамерзающего родника.",
+                "",
+                ChatColor.GRAY + "Говорят, первый глоток раскрывает",
+                ChatColor.GRAY + "в человеке то, что дремало годами:",
+                ChatColor.GRAY + "ясность мысли, твёрдость шага и",
+                ChatColor.GRAY + "тихую уверенность, будто сам мир",
+                ChatColor.GRAY + "на миг склоняется в почтении.",
+                "",
+                ChatColor.DARK_AQUA + "Кубки из этого чая поднимали",
+                ChatColor.DARK_AQUA + "полководцы перед великими битвами,",
+                ChatColor.DARK_AQUA + "а мудрецы — перед решением судеб.",
+                ChatColor.DARK_AQUA + "Его аромат помнят легенды,",
+                ChatColor.DARK_AQUA + "его вкус — только избранные.",
+                "",
+                ChatColor.YELLOW + "" + ChatColor.ITALIC + "Величие в простоте. Сила — в тишине.",
+                ChatColor.DARK_GRAY + "ПКМ — пригубить легенду"
+        ));
+        m.setCustomModelData(parsleyTeaModelData);
+        m.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+        if (m instanceof org.bukkit.inventory.meta.PotionMeta pm) {
+            pm.setColor(org.bukkit.Color.fromRGB(60, 160, 70));
+            try { pm.clearCustomEffects(); } catch (Throwable ignored) {}
+        }
+        m.getPersistentDataContainer().set(keyParsleyTea, PersistentDataType.BYTE, (byte)1);
+        it.setItemMeta(m);
+        return it;
+    }
+
+    /**
+     * Легендарный «Оливковый чай» — напиток Средиземноморья сервера.
+     * Лор без эффектов; механика богаче петрушевого (аура + долгие баффы).
+     */
+    private ItemStack buildOliveTea(int amount) {
+        ItemStack it = new ItemStack(Material.POTION, Math.max(1, amount));
+        ItemMeta m = it.getItemMeta();
+        m.setDisplayName(ChatColor.GOLD + "" + ChatColor.BOLD + "🫒 Оливковый чай");
+        m.setLore(List.of(
+                ChatColor.YELLOW + "" + ChatColor.ITALIC + "Нектар тысячелетней рощи",
+                "",
+                ChatColor.GOLD + "Там, где море целует камень,",
+                ChatColor.GOLD + "растёт роща, которой нет на картах.",
+                ChatColor.DARK_GREEN + "Её оливы помнят имена царей,",
+                ChatColor.DARK_GREEN + "что давно стали пылью, и всё ещё",
+                ChatColor.DARK_GREEN + "держат в кронах их клятвы.",
+                "",
+                ChatColor.GRAY + "Листья для этого чая срывают только",
+                ChatColor.GRAY + "на рассвете третьего дня после бури,",
+                ChatColor.GRAY + "когда серебро на пластинах ещё не",
+                ChatColor.GRAY + "высохло, а ветер пахнет солью и мёдом.",
+                ChatColor.GRAY + "Заваривают в глине, обожжённой",
+                ChatColor.GRAY + "на вулканическом пепле, — иначе",
+                ChatColor.GRAY + "напиток «не узнаёт» пьющего.",
+                "",
+                ChatColor.AQUA + "Петрушевый чай даёт силу героя.",
+                ChatColor.AQUA + "Оливковый — даёт " + ChatColor.WHITE + "право быть спокойным",
+                ChatColor.AQUA + "посреди войны: вокруг тебя мир",
+                ChatColor.AQUA + "становится чуть добрее, а вражда",
+                ChatColor.AQUA + "теряет остроту, будто её смягчило",
+                ChatColor.AQUA + "масло древней ветви.",
+                "",
+                ChatColor.DARK_PURPLE + "В эпосе его пили не перед битвой —",
+                ChatColor.DARK_PURPLE + "а " + ChatColor.LIGHT_PURPLE + "после" + ChatColor.DARK_PURPLE + ", когда нужно было",
+                ChatColor.DARK_PURPLE + "собрать разбитое войско и сказать:",
+                ChatColor.LIGHT_PURPLE + "«Мы ещё здесь. Значит — победили.»",
+                "",
+                ChatColor.YELLOW + "" + ChatColor.ITALIC + "Мир — тоже оружие. И самое редкое.",
+                ChatColor.DARK_GRAY + "ПКМ — принять благословение рощи"
+        ));
+        m.setCustomModelData(oliveTeaModelData);
+        m.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+        if (m instanceof org.bukkit.inventory.meta.PotionMeta pm) {
+            // глубокий оливково-золотой
+            pm.setColor(org.bukkit.Color.fromRGB(140, 155, 45));
+            try { pm.clearCustomEffects(); } catch (Throwable ignored) {}
+        }
+        m.getPersistentDataContainer().set(keyOliveTea, PersistentDataType.BYTE, (byte)1);
+        it.setItemMeta(m);
+        return it;
+    }
+
     private ItemStack buildSlobber(int amount) {
         ItemStack it = new ItemStack(Material.FERMENTED_SPIDER_EYE, Math.max(1, amount));
         ItemMeta m = it.getItemMeta();
@@ -1556,6 +1874,8 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
                 inv.setItem(19, buildBonfire(1));
                 inv.setItem(21, buildPlow(1));
                 inv.setItem(23, buildRegionTool(1));
+                inv.setItem(25, buildParsleyTea(1));
+                inv.setItem(29, buildOliveTea(1));
             }
             case CAT_HOOKAH -> {
                 inv.setItem(4, buildPane(Material.NAME_TAG, ChatColor.DARK_AQUA, "Кальян и табаки"));
@@ -1789,6 +2109,8 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
             if (slot == 19) giveItem(p, buildBonfire(1), Sound.ITEM_FIRECHARGE_USE, 1.0f, "🔥 Ритуальный костёр");
             if (slot == 21) giveItem(p, buildPlow(1), Sound.ITEM_HOE_TILL, 1.2f, "⛏ Плуг");
             if (slot == 23) giveItem(p, buildRegionTool(1), Sound.ITEM_BOOK_PAGE_TURN, 1.0f, "🗺 Жезл территорий");
+            if (slot == 25) giveItem(p, buildParsleyTea(1), Sound.ENTITY_GENERIC_DRINK, 1.1f, "🌿 Петрушевый чай");
+            if (slot == 29) giveItem(p, buildOliveTea(1), Sound.ENTITY_GENERIC_DRINK, 0.9f, "🫒 Оливковый чай");
         } else if (cat.equals(CAT_HOOKAH)) {
             if (slot == 22) giveItem(p, buildHookahItem(1), Sound.BLOCK_BREWING_STAND_BREW, 1.0f, "💨 Кальян");
             Map<Integer, Integer> tob = new HashMap<>();
@@ -1848,6 +2170,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     // ==================== МАСКА: ИСПОЛЬЗОВАНИЕ ====================
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onMaskUse(PlayerInteractEvent e) {
+        if (e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
         ItemStack main = p.getInventory().getItemInMainHand();
         if (!isMask(main)) return;
@@ -1950,11 +2273,38 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     }
 
     // ==================== ВХОД/ВЫХОД/КИК/АДВАНС ====================
+
+    /** Maintenance: режем вход до загрузки мира (ник/UUID). */
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onMaintenancePreLogin(AsyncPlayerPreLoginEvent e) {
+        if (!maintenanceEnabled) return;
+        if (e.getLoginResult() != AsyncPlayerPreLoginEvent.Result.ALLOWED) return;
+        String name = e.getName() != null ? e.getName() : "";
+        UUID uuid = e.getUniqueId();
+        if (isOnMaintenanceWhitelist(name, uuid)) return;
+        // bypass на pre-login недоступен (Player ещё нет) — только список.
+        // OP тоже должен быть в maintenance-whitelist (или зайти с bypass после - через join-kick нет).
+        e.disallow(AsyncPlayerPreLoginEvent.Result.KICK_WHITELIST, colorize(maintenanceKickMessage));
+    }
+
+    /** Запасной кик на join: срабатывает, если есть tactic.maintenance.bypass — пускаем. */
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onMaintenanceJoin(PlayerJoinEvent e) {
+        if (!maintenanceEnabled) return;
+        Player p = e.getPlayer();
+        if (p.hasPermission("tactic.maintenance.bypass")) return;
+        if (isOnMaintenanceWhitelist(p.getName(), p.getUniqueId())) return;
+        Bukkit.getScheduler().runTask(this, () -> {
+            if (p.isOnline()) p.kick(colorize(maintenanceKickMessage));
+        });
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onJoin(PlayerJoinEvent e) {
         Player p = e.getPlayer();
-        // Загружаем сохранённую в PDC стадию мяу-вируса при входе
+        // Загружаем сохранённую в PDC стадию мяу-вируса + маску при входе
         loadMeowStage(p);
+        restoreMaskFromPdc(p);
         if (isMasked(p)) {
             p.setDisplayName(maskColored); p.setPlayerListName(maskColored);
             getHideTeam().addEntry(p.getName());
@@ -1966,6 +2316,10 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     public void onQuit(PlayerQuitEvent e) {
         Player p = e.getPlayer();
         UUID uid = p.getUniqueId();
+        // Админ-мод: перед выходом вернуть survival-инвентарь (admin-инв запомнится)
+        if (adMode.contains(uid)) {
+            try { exitAdminMode(p, false); } catch (Throwable ignored) {}
+        }
         stopSmoke(uid);
         nicotineHits.remove(uid);
         overdoseDeaths.remove(uid);
@@ -2043,6 +2397,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     // ==================== ДИНАМИТ (убран буст игрокам, только ломание + урон) ====================
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onDynamiteInteract(PlayerInteractEvent e) {
+        if (e.getHand() != null && e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
         ItemStack hand = p.getInventory().getItemInMainHand();
         if (!isDynamite(hand)) return;
@@ -2367,6 +2722,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     // ==================== ФАЕРБОЛ (ЕДИНСТВЕННЫЙ с rocket boost) ====================
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onFireballUse(PlayerInteractEvent e) {
+        if (e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
         ItemStack hand = p.getInventory().getItemInMainHand();
         if (!isFireballItem(hand) || !e.getAction().name().startsWith("RIGHT_CLICK")) return;
@@ -2425,6 +2781,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     // ==================== ЛИПКАЯ БОМБА ====================
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onStickyInteract(PlayerInteractEvent e) {
+        if (e.getHand() != null && e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
         ItemStack hand = p.getInventory().getItemInMainHand();
         if (!isStickyItem(hand)) return;
@@ -2531,6 +2888,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     // ==================== ДЫМОВАЯ ШАШКА (только дым, без взрывов, без летающего блока) ====================
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onSmokeInteract(PlayerInteractEvent e) {
+        if (e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
         ItemStack hand = p.getInventory().getItemInMainHand();
         if (!isSmokeItem(hand)) return;
@@ -2577,6 +2935,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     // ==================== КАССЕТНАЯ ГРАНАТА (только 8 TNT, БЕЗ ДЫМА) ====================
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onGrenadeInteract(PlayerInteractEvent e) {
+        if (e.getHand() != null && e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
         ItemStack hand = p.getInventory().getItemInMainHand();
         if (!isGrenadeItem(hand)) return;
@@ -2826,24 +3185,56 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     // ==================== СИГАРЕТЫ ====================
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onCigInteract(PlayerInteractEvent e) {
+        if (e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
         if (!e.getAction().name().startsWith("RIGHT_CLICK")) return;
         ItemStack hand = p.getInventory().getItemInMainHand();
 
-        // ПКМ пачкой — вытащить одну сигарету (работает в воздухе и по неинтерактивным блокам)
+        // ПКМ пачкой — вытащить одну сигарету (8 в пачке; старые пачки без PDC = полные)
         if (isCigPack(hand) && (e.getClickedBlock() == null || !e.getClickedBlock().getType().isInteractable())) {
             e.setCancelled(true);
             int t = getCigType(hand);
+            int left = getCigPackLeft(hand);
+            if (left <= 0) {
+                p.getInventory().setItemInMainHand(null);
+                p.sendActionBar(ChatColor.RED + "Пачка пуста");
+                return;
+            }
             ItemStack cig = buildCigarette(1, t);
-            Map<Integer, ItemStack> left = p.getInventory().addItem(cig);
-            for (ItemStack lo : left.values()) p.getWorld().dropItemNaturally(p.getLocation(), lo);
-            consumeHand(p);
+            Map<Integer, ItemStack> leftover = p.getInventory().addItem(cig);
+            for (ItemStack lo : leftover.values()) p.getWorld().dropItemNaturally(p.getLocation(), lo);
+            left--;
+            if (left <= 0) {
+                // пачка кончилась
+                if (p.getGameMode() != GameMode.CREATIVE) {
+                    if (hand.getAmount() > 1) {
+                        hand.setAmount(hand.getAmount() - 1);
+                        // оставшийся стак — новые полные пачки; текущую «пустую» убираем через amount
+                        // если amount стал >0 — это другие пачки; ОК
+                    } else {
+                        p.getInventory().setItemInMainHand(null);
+                    }
+                }
+                p.sendActionBar(ChatColor.GRAY + "Вы достали последнюю сигарету · пачка пуста");
+            } else {
+                if (p.getGameMode() != GameMode.CREATIVE) {
+                    // если в стаке несколько пачек — отделяем одну и уменьшаем remaining
+                    if (hand.getAmount() > 1) {
+                        hand.setAmount(hand.getAmount() - 1);
+                        ItemStack used = buildCigPack(1, t, left);
+                        Map<Integer, ItemStack> back = p.getInventory().addItem(used);
+                        for (ItemStack lo : back.values()) p.getWorld().dropItemNaturally(p.getLocation(), lo);
+                    } else {
+                        setCigPackLeft(hand, left);
+                    }
+                }
+                p.sendActionBar(ChatColor.GRAY + "Вы достали сигарету · осталось " + left + "/" + CIG_PACK_SIZE);
+            }
             p.getWorld().playSound(p.getLocation(), Sound.ITEM_ARMOR_EQUIP_LEATHER, 0.7f, 1.0f);
-            p.sendActionBar(ChatColor.GRAY + "Вы достали сигарету");
             return;
         }
 
-        // ПКМ сигаретой — начать курить (3 сек, нельзя двигаться/получать урон)
+        // ПКМ сигаретой — курить на ходу (3 сек). Движение и урон НЕ сбрасывают.
         if (isCigarette(hand) && (e.getClickedBlock() == null || !e.getClickedBlock().getType().isInteractable())) {
             e.setCancelled(true);
             UUID uid = p.getUniqueId();
@@ -2855,32 +3246,23 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         }
     }
 
-    /** Начать процесс курения сигареты: 3 секунд (60 тиков), затем эффекты + никотиновый удар */
+    /** Начать процесс курения сигареты: 3 сек (CIG_SMOKE_TICKS), можно ходить и получать урон. */
     private void startSmoking(Player p, ItemStack cig) {
         UUID uid = p.getUniqueId();
-        Location start = p.getLocation();
         int type = getCigType(cig);
-        // Запрещаем курить в креативе без траты предмета? Нет — в креативе тоже забираем (как указано consumeHand)
-        // Но фактически consumeHand вернёт предмет.
-        final Location[] lastSafe = { start };
         long[] ticks = { 0 };
         int taskId = Bukkit.getScheduler().runTaskTimer(this, new Runnable() {
             @Override public void run() {
                 if (!p.isOnline() || !p.isValid()) { stopSmoke(uid); return; }
-                // Отмена если игрок начал бежать (переместился больше чем на 0.5 блока)
-                Location now = p.getLocation();
-                if (now.distanceSquared(lastSafe[0]) > 0.25) {
-                    p.sendMessage(ChatColor.RED + "Курение прервано (движение).");
-                    p.getWorld().playSound(p.getLocation(), Sound.BLOCK_FIRE_EXTINGUISH, 0.7f, 0.8f);
-                    stopSmoke(uid);
-                    return;
-                }
-                // Частицы дыма перед игроком
+                // Частицы дыма перед игроком (курение на ходу)
                 Location mouth = p.getEyeLocation().add(p.getEyeLocation().getDirection().multiply(0.4));
                 p.getWorld().spawnParticle(Particle.CAMPFIRE_COSY_SMOKE, mouth, 3, 0.05, 0.05, 0.05, 0.008);
                 ticks[0] += 2;
                 if (ticks[0] % 10 == 0)
                     p.getWorld().playSound(p.getLocation(), Sound.ENTITY_GENERIC_DRINK, 0.3f, 0.6f);
+                // actionbar прогресс
+                int leftSec = Math.max(0, (int) Math.ceil((CIG_SMOKE_TICKS - ticks[0]) / 20.0));
+                p.sendActionBar(ChatColor.GRAY + "Куришь... " + leftSec + "с");
                 if (ticks[0] >= CIG_SMOKE_TICKS) {
                     finishSmoke(p, type);
                     stopSmoke(uid);
@@ -2888,9 +3270,9 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
             }
         }, 0L, 2L).getTaskId();
         smokingTask.put(uid, (long) taskId);
-        // Сохраняем старт: тратим сигарету сразу — если прервали — не возвращаем (как сигарету бросили)
+        // тратим сигарету сразу
         consumeHand(p);
-        p.sendTitle(" ", ChatColor.GRAY + "Куришь...", 0, 60, 0);
+        p.sendActionBar(ChatColor.GRAY + "Куришь...");
     }
 
     private void stopSmoke(UUID uid) {
@@ -2926,23 +3308,228 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         }
         p.getWorld().spawnParticle(Particle.LARGE_SMOKE, p.getEyeLocation(), 12, 0.25, 0.2, 0.25, 0.02);
         p.getWorld().playSound(p.getLocation(), Sound.BLOCK_FIRE_EXTINGUISH, 0.6f, 0.8f);
+        p.sendActionBar(ChatColor.DARK_GRAY + "Сигарета докурена");
         registerNicotinePuff(p);
     }
 
-    /** Принудительно прерываем курение если игрок получил урон */
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onSmokeDamage(EntityDamageEvent e) {
-        if (!(e.getEntity() instanceof Player p)) return;
-        UUID uid = p.getUniqueId();
-        if (smokingTask.containsKey(uid)) {
-            p.sendMessage(ChatColor.RED + "Курение прервано (получен урон).");
-            stopSmoke(uid);
+    // Курение больше НЕ сбрасывается от урона / ходьбы (onSmokeDamage удалён).
+
+    // ==================== ПЕТРУШЕВЫЙ ЧАЙ ====================
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onParsleyTeaUse(PlayerInteractEvent e) {
+        if (e.getHand() != null && e.getHand() != EquipmentSlot.HAND) return;
+        Player p = e.getPlayer();
+        if (!e.getAction().name().startsWith("RIGHT_CLICK")) return;
+        ItemStack hand = p.getInventory().getItemInMainHand();
+        if (!isParsleyTea(hand)) return;
+        if (e.getClickedBlock() != null && e.getClickedBlock().getType().isInteractable()) return;
+        e.setCancelled(true);
+        drinkParsleyTea(p);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onParsleyTeaConsume(PlayerItemConsumeEvent e) {
+        ItemStack it = e.getItem();
+        if (!isParsleyTea(it)) return;
+        e.setCancelled(true);
+        // ванильное питьё зелья блокируем — даём эффекты сами и тратим 1 шт
+        drinkParsleyTea(e.getPlayer());
+    }
+
+    private void drinkParsleyTea(Player p) {
+        ItemStack hand = p.getInventory().getItemInMainHand();
+        if (!isParsleyTea(hand)) {
+            // на случай если пьют из offhand (consume)
+            ItemStack off = p.getInventory().getItemInOffHand();
+            if (isParsleyTea(off)) {
+                if (p.getGameMode() != GameMode.CREATIVE) {
+                    if (off.getAmount() > 1) off.setAmount(off.getAmount() - 1);
+                    else p.getInventory().setItemInOffHand(null);
+                }
+            } else {
+                return;
+            }
+        } else {
+            consumeHand(p);
+        }
+        int dur = 5 * 60 * 20; // 5 минут
+        // Уровни: Strength IV = amplifier 3; Speed II = 1; Resistance III = 2;
+        // Regeneration IV = 3; Absorption X = 9 (+20 сердец = +40 HP half-hearts? Absorption I = +2 hearts; X = +20 hearts)
+        p.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, dur, 3, false, true, true));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, dur, 1, false, true, true));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, dur, 2, false, true, true));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, dur, 3, false, true, true));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, dur, 9, false, true, true)); // X → +10 сердец (+20 HP)
+        p.getWorld().playSound(p.getLocation(), Sound.ENTITY_GENERIC_DRINK, 1.0f, 1.15f);
+        p.getWorld().playSound(p.getLocation(), Sound.BLOCK_BREWING_STAND_BREW, 0.7f, 1.4f);
+        p.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, p.getLocation().add(0, 1.0, 0), 24, 0.45, 0.5, 0.45, 0.02);
+        p.getWorld().spawnParticle(Particle.HEART, p.getLocation().add(0, 1.2, 0), 6, 0.35, 0.3, 0.35, 0.01);
+        p.sendMessage(ChatColor.GREEN + "🌿 Ты выпил " + ChatColor.BOLD + "Петрушевый чай" + ChatColor.GREEN + ". Легенда течёт в жилах...");
+        p.sendActionBar(ChatColor.DARK_GREEN + "" + ChatColor.ITALIC + "Величие в простоте. Сила — в тишине.");
+    }
+
+    // ==================== ОЛИВКОВЫЙ ЧАЙ ====================
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onOliveTeaUse(PlayerInteractEvent e) {
+        if (e.getHand() != null && e.getHand() != EquipmentSlot.HAND) return;
+        Player p = e.getPlayer();
+        if (!e.getAction().name().startsWith("RIGHT_CLICK")) return;
+        ItemStack hand = p.getInventory().getItemInMainHand();
+        if (!isOliveTea(hand)) return;
+        if (e.getClickedBlock() != null && e.getClickedBlock().getType().isInteractable()) return;
+        e.setCancelled(true);
+        drinkOliveTea(p);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onOliveTeaConsume(PlayerItemConsumeEvent e) {
+        ItemStack it = e.getItem();
+        if (!isOliveTea(it)) return;
+        e.setCancelled(true);
+        drinkOliveTea(e.getPlayer());
+    }
+
+    private void drinkOliveTea(Player p) {
+        ItemStack hand = p.getInventory().getItemInMainHand();
+        if (!isOliveTea(hand)) {
+            ItemStack off = p.getInventory().getItemInOffHand();
+            if (isOliveTea(off)) {
+                if (p.getGameMode() != GameMode.CREATIVE) {
+                    if (off.getAmount() > 1) off.setAmount(off.getAmount() - 1);
+                    else p.getInventory().setItemInOffHand(null);
+                }
+            } else {
+                return;
+            }
+        } else {
+            consumeHand(p);
+        }
+
+        // 8 минут — дольше петрушки; свой набор + уникальная «Сеньория оливы»
+        int dur = 8 * 60 * 20;
+        // Resistance IV, Fire Resistance, Night Vision, Saturation-like via food, Haste II, Luck II, Slow Falling
+        p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, dur, 3, false, true, true));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, dur, 0, false, true, true));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, dur, 0, false, false, true));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, dur, 1, false, true, true));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.LUCK, dur, 1, false, true, true));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, dur, 0, false, true, true));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, dur, 4, false, true, true)); // V = +5♥
+        p.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 30 * 20, 1, false, true, true)); // короткий сильный старт 30с
+        // сытость «масличной трапезы»
+        try {
+            p.setFoodLevel(Math.min(20, p.getFoodLevel() + 8));
+            p.setSaturation(Math.min(20f, p.getSaturation() + 10f));
+        } catch (Throwable ignored) {}
+
+        // Аура мира 8 минут
+        oliveAuraUntil.put(p.getUniqueId(), System.currentTimeMillis() + OLIVE_AURA_MS);
+
+        Location loc = p.getLocation().add(0, 1.0, 0);
+        p.getWorld().playSound(p.getLocation(), Sound.ENTITY_GENERIC_DRINK, 1.0f, 0.85f);
+        p.getWorld().playSound(p.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.55f, 1.35f);
+        p.getWorld().playSound(p.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.7f, 1.1f);
+        try {
+            p.getWorld().spawnParticle(Particle.CHERRY_LEAVES, loc, 40, 0.7, 0.6, 0.7, 0.02);
+        } catch (Throwable t) {
+            p.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, loc, 36, 0.6, 0.5, 0.6, 0.02);
+        }
+        p.getWorld().spawnParticle(Particle.END_ROD, loc, 18, 0.5, 0.45, 0.5, 0.01);
+        p.getWorld().spawnParticle(Particle.GLOW, loc, 12, 0.4, 0.35, 0.4, 0.0);
+
+        p.sendMessage(ChatColor.GOLD + "🫒 Ты выпил " + ChatColor.BOLD + "Оливковый чай" + ChatColor.GOLD + ".");
+        p.sendMessage(ChatColor.GRAY + "Роща признала тебя. Вокруг — " + ChatColor.YELLOW + "Сеньория оливы" + ChatColor.GRAY + " на 8 минут.");
+        p.sendActionBar(ChatColor.GOLD + "" + ChatColor.ITALIC + "Мир — тоже оружие. И самое редкое.");
+    }
+
+    private boolean hasOliveAura(Player p) {
+        if (p == null) return false;
+        Long until = oliveAuraUntil.get(p.getUniqueId());
+        if (until == null) return false;
+        if (System.currentTimeMillis() > until) {
+            oliveAuraUntil.remove(p.getUniqueId());
+            return false;
+        }
+        return true;
+    }
+
+    /** Урон по сущностям отменяется, если жертва (или атакующий PvP) в ауре оливкового чая. */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onOliveAuraDamage(EntityDamageByEntityEvent e) {
+        if (oliveAuraUntil.isEmpty()) return;
+        // очистка просроченных лениво
+        long now = System.currentTimeMillis();
+        oliveAuraUntil.entrySet().removeIf(en -> en.getValue() < now);
+
+        Entity victim = e.getEntity();
+        Entity damager = e.getDamager();
+        if (damager instanceof Projectile proj && proj.getShooter() instanceof Entity sh)
+            damager = sh;
+
+        // 1) Жертва-игрок под своей аурой — неуязвим к чужому урону от entity
+        if (victim instanceof Player vp && hasOliveAura(vp)) {
+            e.setCancelled(true);
+            try {
+                vp.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, vp.getLocation().add(0, 1, 0), 6, 0.3, 0.4, 0.3, 0.01);
+            } catch (Throwable ignored) {}
+            if (damager instanceof Player atk) {
+                atk.sendActionBar(ChatColor.GOLD + "🫒 Сеньория оливы защищает " + vp.getName());
+            }
+            return;
+        }
+
+        // 2) Атакующий под аурой не может бить игроков (мирная сеньория) — но мобов может
+        if (damager instanceof Player atk && hasOliveAura(atk) && victim instanceof Player) {
+            e.setCancelled(true);
+            atk.sendActionBar(ChatColor.GOLD + "🫒 Роща не одобряет вражду между людьми...");
+            return;
+        }
+
+        // 3) Любой урон по мобу/игроку в радиусе 8 блоков от носителя ауры — ослабляется / PvP блок
+        for (Map.Entry<UUID, Long> en : oliveAuraUntil.entrySet()) {
+            Player host = Bukkit.getPlayer(en.getKey());
+            if (host == null || !host.isOnline()) continue;
+            if (!host.getWorld().equals(victim.getWorld())) continue;
+            if (host.getLocation().distanceSquared(victim.getLocation()) > OLIVE_AURA_RADIUS * OLIVE_AURA_RADIUS)
+                continue;
+            // PvP внутри ауры чужого носителя — блок
+            if (victim instanceof Player && damager instanceof Player) {
+                e.setCancelled(true);
+                if (damager instanceof Player atk)
+                    atk.sendActionBar(ChatColor.GOLD + "🫒 Здесь действует Сеньория оливы (" + host.getName() + ")");
+                return;
+            }
+            // урон по мобам в ауре — на 40% меньше (мир смягчает)
+            e.setDamage(e.getDamage() * 0.6);
+            break;
+        }
+    }
+
+    /** Частицы ауры у носителей. */
+    private void tickOliveAuraFx() {
+        if (oliveAuraUntil.isEmpty()) return;
+        long now = System.currentTimeMillis();
+        oliveAuraUntil.entrySet().removeIf(en -> en.getValue() < now);
+        for (UUID uid : new ArrayList<>(oliveAuraUntil.keySet())) {
+            Player p = Bukkit.getPlayer(uid);
+            if (p == null || !p.isOnline()) continue;
+            Location base = p.getLocation().add(0, 0.2, 0);
+            try {
+                p.getWorld().spawnParticle(Particle.CHERRY_LEAVES, base, 3, 0.35, 0.15, 0.35, 0.0);
+            } catch (Throwable t) {
+                p.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, base, 2, 0.3, 0.1, 0.3, 0.0);
+            }
+            if (tickCounter % 40 == 0) {
+                long left = Math.max(0, (oliveAuraUntil.get(uid) - now) / 1000L);
+                p.sendActionBar(ChatColor.GOLD + "🫒 Сеньория оливы · ещё " + left + "с");
+            }
         }
     }
 
     // ==================== ВИРУС МЯУКАНЬЯ: использование вакцины и слюней ====================
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onVaccineUse(PlayerInteractEvent e) {
+        if (e.getHand() != null && e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
         ItemStack hand = p.getInventory().getItemInMainHand();
         if (!e.getAction().name().startsWith("RIGHT_CLICK")) return;
@@ -3152,8 +3739,9 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         }
     }
 
-    /** Маска 🎭 — это кастомная маска plugin'а (PAPER c keyMask) надетая в слоте шлема */
+    /** Маска 🎭 снижает шанс заражения: либо активный эффект маски, либо paper-маска в шлеме. */
     private boolean isWearingMeowMask(Player p) {
+        if (isMasked(p)) return true;
         ItemStack helmet = p.getInventory().getHelmet();
         return helmet != null && isMask(helmet);
     }
@@ -3323,6 +3911,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     // ==================== САМОНАВОДЯЩИЙСЯ ЛУК ====================
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onHomingBowUse(PlayerInteractEvent e) {
+        if (e.getHand() != null && e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
         ItemStack hand = p.getInventory().getItemInMainHand();
         if (!isHomingBow(hand)) return;
@@ -3348,10 +3937,13 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     /** Тик удержания цели (когда натягивается тетива) и полёт самонаводящихся стрел */
     private void tickHoming() {
         // ---- 1) Захват цели / перманентное удержание ----
+        // Если никто не держит лок и нет стрел — почти no-op
         for (Player p : Bukkit.getOnlinePlayers()) {
             UUID uid = p.getUniqueId();
             ItemStack hand = p.getInventory().getItemInMainHand();
             boolean bowInHand = isHomingBow(hand);
+            // Нет лука в руке и нет лока — пропускаем (дешёвый early-out)
+            if (!bowInHand && !homingLocks.containsKey(uid)) continue;
             boolean isCharging = bowInHand
                     && p.getActiveItem() != null
                     && p.getActiveItem().getType() == Material.BOW
@@ -3417,91 +4009,90 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
                     + (cur.progress >= HOMING_LOCK_TICKS ? " §a✓ ЗАХВАЧЕНО" : ""));
         }
 
-        // ---- 2) Полёт самонаводящихся стрел (с упреждением и гравитационной компенсацией) ----
-        for (World w : Bukkit.getWorlds()) {
-            for (Arrow arrow : w.getEntitiesByClass(Arrow.class)) {
-                var pdc = arrow.getPersistentDataContainer();
-                if (!pdc.has(keyHomingArrow, PersistentDataType.BYTE)) continue;
-                String targetStr = pdc.get(keyHomingTarget, PersistentDataType.STRING);
-                if (targetStr == null) { pdc.remove(keyHomingArrow); pdc.remove(keyHomingTarget); continue; }
+        // ---- 2) Полёт ТОЛЬКО отслеживаемых самонаводящихся стрел (без getEntitiesByClass!) ----
+        if (trackedHomingArrows.isEmpty()) return;
+        for (UUID arrowId : trackedHomingArrows.toArray(new UUID[0])) {
+            Entity raw = Bukkit.getEntity(arrowId);
+            if (!(raw instanceof Arrow arrow) || !arrow.isValid() || arrow.isDead()) {
+                trackedHomingArrows.remove(arrowId);
+                continue;
+            }
+            var pdc = arrow.getPersistentDataContainer();
+            if (!pdc.has(keyHomingArrow, PersistentDataType.BYTE)) {
+                trackedHomingArrows.remove(arrowId);
+                continue;
+            }
+            String targetStr = pdc.get(keyHomingTarget, PersistentDataType.STRING);
+            if (targetStr == null) {
+                pdc.remove(keyHomingArrow);
+                pdc.remove(keyHomingTarget);
+                trackedHomingArrows.remove(arrowId);
+                continue;
+            }
 
-                Entity target = null;
-                try {
-                    UUID tu = UUID.fromString(targetStr);
-                    target = Bukkit.getEntity(tu);
-                } catch (Exception ignored) {}
+            Entity target = null;
+            try {
+                target = Bukkit.getEntity(UUID.fromString(targetStr));
+            } catch (Exception ignored) {}
 
-                if (target == null || target.isDead() || !target.isValid()
-                        || arrow.isInBlock() || arrow.isOnGround()
-                        || arrow.getLocation().distanceSquared(target.getLocation()) > HOMING_MAX_DIST*HOMING_MAX_DIST) {
-                    pdc.remove(keyHomingArrow);
-                    pdc.remove(keyHomingTarget);
-                    continue;
-                }
+            World w = arrow.getWorld();
+            if (target == null || target.isDead() || !target.isValid()
+                    || arrow.isInBlock() || arrow.isOnGround()
+                    || !w.equals(target.getWorld())
+                    || arrow.getLocation().distanceSquared(target.getLocation()) > HOMING_MAX_DIST * HOMING_MAX_DIST) {
+                pdc.remove(keyHomingArrow);
+                pdc.remove(keyHomingTarget);
+                trackedHomingArrows.remove(arrowId);
+                continue;
+            }
 
-                Location aloc = arrow.getLocation();
-                // Точка прицеливания = центр hitbox'а цели
-                Location tloc = target.getLocation().add(0, target.getHeight()*0.55, 0);
+            Location aloc = arrow.getLocation();
+            Location tloc = target.getLocation().add(0, target.getHeight() * 0.55, 0);
+            Vector tVel = target.getVelocity();
+            double dist = aloc.distance(tloc);
+            Location aim = tloc.clone();
+            for (int iter = 0; iter < 2; iter++) {
+                double pd = aloc.distance(aim);
+                double t = pd / HOMING_SPEED / 20.0;
+                aim = tloc.clone().add(tVel.clone().multiply(t * 20.0));
+            }
 
-                // Итеративное упреждение (Ньютон): считаем примерное время подлёта и двигаем
-                // точку прицеливания вперёд по скорости цели, учитывая и скорость стрелы и гравитацию.
-                Vector tVel = target.getVelocity();
-                double dist = aloc.distance(tloc);
-                // Итерации уточнения упреждения (2 прохода)
-                Location aim = tloc.clone();
-                for (int iter = 0; iter < 2; iter++) {
-                    double pd = aloc.distance(aim);
-                    double t = pd / HOMING_SPEED / 20.0;
-                    aim = tloc.clone().add(tVel.clone().multiply(t * 20.0));
-                }
+            Vector wantDir = aim.toVector().subtract(aloc.toVector());
+            if (wantDir.lengthSquared() < 0.05) continue;
+            wantDir = wantDir.normalize();
 
-                // Вектор желательного направления — на упреждённую точку
-                Vector wantDir = aim.toVector().subtract(aloc.toVector());
-                if (wantDir.lengthSquared() < 0.05) continue;
-                wantDir = wantDir.normalize();
+            Vector vel = arrow.getVelocity();
+            double curSpeed = vel.length();
+            if (curSpeed < 0.3) {
+                pdc.remove(keyHomingArrow);
+                pdc.remove(keyHomingTarget);
+                trackedHomingArrows.remove(arrowId);
+                continue;
+            }
+            Vector curDir = vel.clone().normalize();
+            double distFactor = Math.max(0.0, Math.min(1.0, (20.0 - dist) / 20.0));
+            double turn = HOMING_TURN_RATE + (HOMING_TURN_RATE_NEAR - HOMING_TURN_RATE) * distFactor;
+            Vector newDir = curDir.multiply(1.0 - turn).add(wantDir.multiply(turn)).normalize();
+            Vector newVel = newDir.clone().multiply(HOMING_SPEED);
+            newVel.setY(newVel.getY() + HOMING_GRAVITY_COMP);
+            arrow.setVelocity(newVel);
 
-                Vector vel = arrow.getVelocity();
-                double curSpeed = vel.length();
-                if (curSpeed < 0.3) { pdc.remove(keyHomingArrow); pdc.remove(keyHomingTarget); continue; }
-                Vector curDir = vel.clone().normalize();
+            // Меньше частиц/звука — меньше лагов
+            if (tickCounter % 4 == 0) {
+                try { w.spawnParticle(Particle.END_ROD, aloc, 1, 0.03, 0.03, 0.03, 0.0); }
+                catch (Throwable ignored) {}
+            }
 
-                // Доля поворота: чем ближе — тем резче доворачиваем
-                double distFactor = Math.max(0.0, Math.min(1.0, (20.0 - dist) / 20.0));
-                double turn = HOMING_TURN_RATE + (HOMING_TURN_RATE_NEAR - HOMING_TURN_RATE) * distFactor;
-
-                // Плавная интерполяция направления (SLERP-аппроксимация)
-                Vector newDir = curDir.multiply(1.0 - turn).add(wantDir.multiply(turn)).normalize();
-
-                // Компенсация гравитации: поднимаем нос стрелы чуть вверх, чтобы не падала
-                Vector newVel = newDir.clone().multiply(HOMING_SPEED);
-                newVel.setY(newVel.getY() + HOMING_GRAVITY_COMP);
-
-                arrow.setVelocity(newVel);
-
-                // Частицы следа: смесь END_ROD + ENCHANTED_HIT — магическо-светящийся хвост
-                if (tickCounter % 2 == 0) {
-                    w.spawnParticle(Particle.END_ROD, aloc, 2, 0.04, 0.04, 0.04, 0.0);
-                    try { w.spawnParticle(Particle.ENCHANTED_HIT, aloc, 3, 0.08,0.08,0.08,0.05); }
-                    catch (Throwable ignored) {
-                        try { w.spawnParticle(Particle.valueOf("CRIT_MAGIC"), aloc, 3, 0.08,0.08,0.08,0.05); }
-                        catch (Throwable ignored2) {}
-                    }
-                }
-                // Звук свиста редко
-                if (tickCounter % 8 == 0) w.playSound(aloc, Sound.ENTITY_ARROW_SHOOT, 0.25f, 1.6f);
-
-                // Авопопадание: если мы вплотную к цели — наносим урон вручную и гасим стрелу,
-                // чтобы не пролетала мимо из-за тик-рейта
-                if (dist < 1.2 && target instanceof LivingEntity living) {
-                    double dmg = 7.0; // урон как полноценный выстрел
-                    if (target instanceof Player) dmg = 6.0;
-                    living.damage(dmg, (arrow.getShooter() instanceof LivingEntity sh) ? sh : null);
-                    w.spawnParticle(Particle.CRIT, aim, 10, 0.2,0.2,0.2,0.15);
-                    playSoundSafe(w, aim, 1.0f, 1.3f, "ENTITY_ARROW_HIT", "ITEM_CROSSBOW_HIT");
-                    arrow.remove();
-                    pdc.remove(keyHomingArrow);
-                    pdc.remove(keyHomingTarget);
-                }
+            if (dist < 1.2 && target instanceof LivingEntity living) {
+                double dmg = (target instanceof Player) ? 6.0 : 7.0;
+                living.damage(dmg, (arrow.getShooter() instanceof LivingEntity sh) ? sh : null);
+                try { w.spawnParticle(Particle.CRIT, aim, 8, 0.2, 0.2, 0.2, 0.12); }
+                catch (Throwable ignored) {}
+                playSoundSafe(w, aim, 1.0f, 1.3f, "ENTITY_ARROW_HIT", "ITEM_CROSSBOW_HIT");
+                arrow.remove();
+                pdc.remove(keyHomingArrow);
+                pdc.remove(keyHomingTarget);
+                trackedHomingArrows.remove(arrowId);
             }
         }
     }
@@ -3538,7 +4129,20 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         boolean wantPlayers = (mode == HOMING_MODE_PLAYERS || mode == HOMING_MODE_ALL);
         boolean wantMobs    = (mode == HOMING_MODE_MOBS    || mode == HOMING_MODE_ALL);
 
-        Collection<Entity> nearby = p.getWorld().getNearbyEntities(eye, HOMING_LOCK_RANGE, HOMING_LOCK_RANGE, HOMING_LOCK_RANGE);
+        // PLAYERS-only: не сканируем все entity мира — только онлайн-игроков (дешёво)
+        Collection<? extends Entity> nearby;
+        if (wantPlayers && !wantMobs) {
+            List<Entity> list = new ArrayList<>();
+            double r2 = HOMING_LOCK_RANGE * HOMING_LOCK_RANGE;
+            for (Player op : p.getWorld().getPlayers()) {
+                if (op.equals(p)) continue;
+                if (op.getLocation().distanceSquared(eye) <= r2) list.add(op);
+            }
+            nearby = list;
+        } else {
+            // ALL / MOBS — nearby, но без огромного радиуса по Y (плоскость боя)
+            nearby = p.getWorld().getNearbyEntities(eye, HOMING_LOCK_RANGE, Math.min(24.0, HOMING_LOCK_RANGE), HOMING_LOCK_RANGE);
+        }
         for (Entity ent : nearby) {
             if (ent.equals(p)) continue;
             if (ent instanceof Item || ent instanceof ExperienceOrb || ent instanceof AbstractArrow
@@ -3585,6 +4189,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         resetArrowKnockback(arrow);
         var pdc = arrow.getPersistentDataContainer();
         pdc.set(keyHomingArrow, PersistentDataType.BYTE, (byte)1);
+        trackedHomingArrows.add(arrow.getUniqueId());
         // Используем UUID цели — работает и для игроков, и для мобов в современном Bukkit
         pdc.set(keyHomingTarget, PersistentDataType.STRING, tgt.getUniqueId().toString());
         try { arrow.setShooter(p); } catch (Exception ignored) {}
@@ -3625,6 +4230,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     /** Shift+ПКМ с луком сбрасывает захват */
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onHomingRelease(PlayerInteractEvent e) {
+        if (e.getHand() != null && e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
         if (!isHomingBow(p.getInventory().getItemInMainHand())) return;
         if (!p.isSneaking()) return;
@@ -3924,6 +4530,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     // ==================== ПЛУГ ====================
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlowInteract(PlayerInteractEvent e) {
+        if (e.getHand() != null && e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
         ItemStack hand = p.getInventory().getItemInMainHand();
         if (!isPlow(hand)) return;
@@ -4150,6 +4757,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     // ==================== КАЛЬЯН ====================
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onHookahUse(PlayerInteractEvent e) {
+        if (e.getHand() != null && e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
         if (!e.getAction().name().startsWith("RIGHT_CLICK")) return;
 
@@ -5274,6 +5882,15 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         return null;
     }
 
+    /** resolve + Glad-защита: null если защищён (сообщение уже отправлено) или не найден. */
+    private UUID resolvePlayerAllowGlad(CommandSender sender, String name) {
+        if (isGladProtectedFromName(sender, name)) {
+            msgGladProtected(sender);
+            return null;
+        }
+        return resolvePlayer(name);
+    }
+
     /** ЛКМ/ПКМ жезлом по блоку — выделение региона */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onRegionInteract(PlayerInteractEvent e) {
@@ -5434,7 +6051,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
             r.rules = new ArrayList<>();
             regions.put(name, r);
             saveRegionsToConfig();
-            p.sendMessage(ChatColor.GREEN + "🗺 Регион §f" + name + " §aсоздан! Используйте /region rules add <текст> чтобы добавить правила.");
+            p.sendMessage(ChatColor.GREEN + "🗺 Регион §f" + name + " §aсоздан! Правила: /region rules " + name + " add <текст>");
             p.playSound(p.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.7f, 1.0f);
             return true;
         }
@@ -5491,9 +6108,9 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
                 sender.sendMessage(ChatColor.GRAY + "Правила региона §f" + r.name + "§7:");
                 if (r.rules.isEmpty()) sender.sendMessage(ChatColor.GRAY + "  (нет правил)");
                 else for (String line : r.rules) sender.sendMessage(colorize(line));
-                sender.sendMessage(ChatColor.YELLOW + "/region rules add <name> <текст> — добавить");
-                sender.sendMessage(ChatColor.YELLOW + "/region rules clear <name> — очистить");
-                sender.sendMessage(ChatColor.YELLOW + "/region rules set <name> <№> <текст> — изменить");
+                sender.sendMessage(ChatColor.YELLOW + "/region rules <name> add <текст> — добавить");
+                sender.sendMessage(ChatColor.YELLOW + "/region rules <name> clear — очистить");
+                sender.sendMessage(ChatColor.YELLOW + "/region rules <name> set <№> <текст> — изменить");
                 return true;
             }
             String act = args[3].toLowerCase(java.util.Locale.ROOT);
@@ -5549,8 +6166,13 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
             String act = args[3].toLowerCase(java.util.Locale.ROOT);
             if (act.equals("add") || act.equals("добавить")) {
                 if (args.length < 5) { sender.sendMessage(ChatColor.RED + "/region coowner add <название> <игрок>"); return true; }
-                UUID tgt = resolvePlayer(args[4]);
-                if (tgt == null) { sender.sendMessage(ChatColor.RED + "Игрок не найден."); return true; }
+                UUID tgt = resolvePlayerAllowGlad(sender, args[4]);
+                if (tgt == null) {
+                    // если Glad-защита — сообщение уже отправлено
+                    if (!(gladProtectEnabled && isGladName(args[4])))
+                        sender.sendMessage(ChatColor.RED + "Игрок не найден.");
+                    return true;
+                }
                 if (r.coowners.contains(tgt)) { sender.sendMessage(ChatColor.RED + "Этот игрок уже совладелец."); return true; }
                 if (r.owner.equals(tgt)) { sender.sendMessage(ChatColor.RED + "Это владелец региона."); return true; }
                 r.coowners.add(tgt);
@@ -5560,8 +6182,13 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
             }
             if (act.equals("remove") || act.equals("del") || act.equals("удалить")) {
                 if (args.length < 5) { sender.sendMessage(ChatColor.RED + "/region coowner remove <название> <игрок>"); return true; }
-                UUID tgt = resolvePlayer(args[4]);
-                if (tgt == null) { sender.sendMessage(ChatColor.RED + "Игрок не найден."); return true; }
+                UUID tgt = resolvePlayerAllowGlad(sender, args[4]);
+                if (tgt == null) {
+                    // если Glad-защита — сообщение уже отправлено
+                    if (!(gladProtectEnabled && isGladName(args[4])))
+                        sender.sendMessage(ChatColor.RED + "Игрок не найден.");
+                    return true;
+                }
                 if (!r.coowners.remove(tgt)) { sender.sendMessage(ChatColor.RED + "Этого игрока нет в совладельцах."); return true; }
                 saveRegionsToConfig();
                 sender.sendMessage(ChatColor.GREEN + "Совладелец удалён.");
@@ -5581,8 +6208,13 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
             String act = args[3].toLowerCase(java.util.Locale.ROOT);
             if (act.equals("add") || act.equals("добавить")) {
                 if (args.length < 5) { sender.sendMessage(ChatColor.RED + "/region blacklist add <название> <игрок>"); return true; }
-                UUID tgt = resolvePlayer(args[4]);
-                if (tgt == null) { sender.sendMessage(ChatColor.RED + "Игрок не найден."); return true; }
+                UUID tgt = resolvePlayerAllowGlad(sender, args[4]);
+                if (tgt == null) {
+                    // если Glad-защита — сообщение уже отправлено
+                    if (!(gladProtectEnabled && isGladName(args[4])))
+                        sender.sendMessage(ChatColor.RED + "Игрок не найден.");
+                    return true;
+                }
                 if (r.owner.equals(tgt) || r.coowners.contains(tgt)) { sender.sendMessage(ChatColor.RED + "Нельзя внести владельца/совладельца в ЧС."); return true; }
                 if (!r.blacklist.add(tgt)) { sender.sendMessage(ChatColor.RED + "Этот игрок уже в чёрном списке."); return true; }
                 saveRegionsToConfig();
@@ -5591,8 +6223,13 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
             }
             if (act.equals("remove") || act.equals("del") || act.equals("удалить")) {
                 if (args.length < 5) { sender.sendMessage(ChatColor.RED + "/region blacklist remove <название> <игрок>"); return true; }
-                UUID tgt = resolvePlayer(args[4]);
-                if (tgt == null) { sender.sendMessage(ChatColor.RED + "Игрок не найден."); return true; }
+                UUID tgt = resolvePlayerAllowGlad(sender, args[4]);
+                if (tgt == null) {
+                    // если Glad-защита — сообщение уже отправлено
+                    if (!(gladProtectEnabled && isGladName(args[4])))
+                        sender.sendMessage(ChatColor.RED + "Игрок не найден.");
+                    return true;
+                }
                 if (!r.blacklist.remove(tgt)) { sender.sendMessage(ChatColor.RED + "Этого игрока нет в чёрном списке."); return true; }
                 saveRegionsToConfig();
                 sender.sendMessage(ChatColor.GREEN + "Игрок убран из чёрного списка.");
@@ -5610,8 +6247,13 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
             String act = args[3].toLowerCase(java.util.Locale.ROOT);
             if (act.equals("add") || act.equals("добавить")) {
                 if (args.length < 5) { sender.sendMessage(ChatColor.RED + "/region member add <название> <игрок>"); return true; }
-                UUID tgt = resolvePlayer(args[4]);
-                if (tgt == null) { sender.sendMessage(ChatColor.RED + "Игрок не найден."); return true; }
+                UUID tgt = resolvePlayerAllowGlad(sender, args[4]);
+                if (tgt == null) {
+                    // если Glad-защита — сообщение уже отправлено
+                    if (!(gladProtectEnabled && isGladName(args[4])))
+                        sender.sendMessage(ChatColor.RED + "Игрок не найден.");
+                    return true;
+                }
                 if (r.members.contains(tgt)) { sender.sendMessage(ChatColor.RED + "Этот игрок уже участник."); return true; }
                 if (r.coowners.contains(tgt) || r.owner.equals(tgt)) { sender.sendMessage(ChatColor.RED + "Это владелец/совладелец."); return true; }
                 r.members.add(tgt);
@@ -5621,8 +6263,13 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
             }
             if (act.equals("remove") || act.equals("del") || act.equals("удалить")) {
                 if (args.length < 5) { sender.sendMessage(ChatColor.RED + "/region member remove <название> <игрок>"); return true; }
-                UUID tgt = resolvePlayer(args[4]);
-                if (tgt == null) { sender.sendMessage(ChatColor.RED + "Игрок не найден."); return true; }
+                UUID tgt = resolvePlayerAllowGlad(sender, args[4]);
+                if (tgt == null) {
+                    // если Glad-защита — сообщение уже отправлено
+                    if (!(gladProtectEnabled && isGladName(args[4])))
+                        sender.sendMessage(ChatColor.RED + "Игрок не найден.");
+                    return true;
+                }
                 if (!r.members.remove(tgt)) { sender.sendMessage(ChatColor.RED + "Этого игрока нет в участниках."); return true; }
                 saveRegionsToConfig();
                 sender.sendMessage(ChatColor.GREEN + "Участник удалён.");
@@ -5720,11 +6367,135 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         Set<UUID> blacklist = new HashSet<>();
     }
 
+    // ==================== ЗАЩИТА GLAD ====================
+    private boolean isGladName(String name) {
+        return name != null && name.equalsIgnoreCase(GLAD_NAME);
+    }
+
+    /** true = цель Glad под защитой и sender — не сам Glad (чужая команда). */
+    private boolean isGladProtectedFrom(CommandSender sender, Player target) {
+        if (!gladProtectEnabled || target == null) return false;
+        if (!isGladName(target.getName())) return false;
+        if (sender instanceof Player sp && isGladName(sp.getName())) return false; // сам на себя — можно
+        return true;
+    }
+
+    private boolean isGladProtectedFromName(CommandSender sender, String targetName) {
+        if (!gladProtectEnabled || targetName == null || targetName.isEmpty()) return false;
+        if (!isGladName(targetName)) return false;
+        if (sender instanceof Player sp && isGladName(sp.getName())) return false;
+        return true;
+    }
+
+    private void msgGladProtected(CommandSender sender) {
+        sender.sendMessage(ChatColor.RED + "✦ Игрок §fGlad §cпод защитой Tactic. Чужие команды на него не действуют.");
+    }
+
+    /** @return true если действие нужно прервать */
+    private boolean denyIfGladProtected(CommandSender sender, Player target) {
+        if (!isGladProtectedFrom(sender, target)) return false;
+        msgGladProtected(sender);
+        return true;
+    }
+
+    private void saveGladProtectToConfig() {
+        getConfig().set("glad-protect-enabled", gladProtectEnabled);
+        saveConfig();
+    }
+
+    /**
+     * Глобальный щит: любая команда игрока, где в аргументах есть ник Glad,
+     * отменяется (кроме случая, когда команду вводит сам Glad).
+     */
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onGladCommandShield(PlayerCommandPreprocessEvent e) {
+        if (!gladProtectEnabled) return;
+        Player sender = e.getPlayer();
+        if (isGladName(sender.getName())) return; // Glad может всё, в т.ч. на себя
+        String raw = e.getMessage();
+        if (raw == null || raw.length() < 2) return;
+        // "/cmd arg1 arg2" → токены
+        String body = raw.charAt(0) == '/' ? raw.substring(1) : raw;
+        String[] parts = body.trim().split("\s+");
+        for (int i = 1; i < parts.length; i++) { // args only, not command name
+            String tok = parts[i];
+            // снять кавычки/запятые на всякий
+            if (tok.length() >= 2 && tok.charAt(0) == '"' && tok.charAt(tok.length() - 1) == '"')
+                tok = tok.substring(1, tok.length() - 1);
+            if (tok.endsWith(",")) tok = tok.substring(0, tok.length() - 1);
+            if (isGladName(tok)) {
+                e.setCancelled(true);
+                msgGladProtected(sender);
+                return;
+            }
+        }
+    }
+
+    /** Консоль/RCON тоже не целится в Glad, пока защита вкл (кроме «обхода» нет — как просили). */
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onGladConsoleShield(org.bukkit.event.server.ServerCommandEvent e) {
+        if (!gladProtectEnabled) return;
+        String raw = e.getCommand();
+        if (raw == null || raw.isEmpty()) return;
+        String body = raw.charAt(0) == '/' ? raw.substring(1) : raw;
+        String[] parts = body.trim().split("\s+");
+        for (int i = 1; i < parts.length; i++) {
+            String tok = parts[i];
+            if (tok.length() >= 2 && tok.charAt(0) == '"' && tok.charAt(tok.length() - 1) == '"')
+                tok = tok.substring(1, tok.length() - 1);
+            if (isGladName(tok)) {
+                e.setCancelled(true);
+                e.getSender().sendMessage(ChatColor.RED + "✦ Glad под защитой Tactic (/tactic glad off чтобы снять).");
+                return;
+            }
+        }
+    }
+
+    private boolean gladCmd(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("tactic.glad") && !sender.hasPermission("tactic.reload")) {
+            sender.sendMessage(msg("no-permission").isEmpty() ? ChatColor.RED + "Нет прав." : msg("no-permission"));
+            return true;
+        }
+        if (args.length < 2) {
+            sender.sendMessage(ChatColor.GOLD + "=== ✦ Защита Glad ===");
+            sender.sendMessage(ChatColor.GRAY + "Статус: " + (gladProtectEnabled ? "§aВКЛ" : "§cВЫКЛ"));
+            sender.sendMessage(ChatColor.GRAY + "Ник: §f" + GLAD_NAME);
+            sender.sendMessage(ChatColor.YELLOW + "/tactic glad on|off|status");
+            sender.sendMessage(ChatColor.DARK_GRAY + "Вкл: чужие команды не действуют на Glad; он сам на себя — может.");
+            return true;
+        }
+        String act = args[1].toLowerCase(java.util.Locale.ROOT);
+        if (act.equals("on") || act.equals("enable") || act.equals("true") || act.equals("вкл")) {
+            gladProtectEnabled = true;
+            saveGladProtectToConfig();
+            sender.sendMessage(ChatColor.GREEN + "✦ Защита Glad §aВКЛЮЧЕНА§a. Чужие команды на него блокируются.");
+            Bukkit.getLogger().info("[Tactic] Glad protect ON by " + sender.getName());
+            return true;
+        }
+        if (act.equals("off") || act.equals("disable") || act.equals("false") || act.equals("выкл")) {
+            gladProtectEnabled = false;
+            saveGladProtectToConfig();
+            sender.sendMessage(ChatColor.YELLOW + "✦ Защита Glad §cВЫКЛЮЧЕНА§e. Обычный режим.");
+            Bukkit.getLogger().info("[Tactic] Glad protect OFF by " + sender.getName());
+            return true;
+        }
+        if (act.equals("status") || act.equals("info")) {
+            sender.sendMessage(ChatColor.GOLD + "✦ Glad protect: " + (gladProtectEnabled ? "§aВКЛ" : "§cВЫКЛ"));
+            return true;
+        }
+        sender.sendMessage(ChatColor.RED + "Использование: /tactic glad <on|off|status>");
+        return true;
+    }
+
     // ==================== КОМАНДА ====================
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-        // Обработка /region (с алиасами rg/территория)
         String cmdName = cmd.getName().toLowerCase(java.util.Locale.ROOT);
+        // /ad — админ-мод
+        if (cmdName.equals("ad") || cmdName.equals("adminmode") || cmdName.equals("amode")) {
+            return adCommand(sender);
+        }
+        // Обработка /region (с алиасами rg/территория)
         if (cmdName.equals("region")) {
             if (!sender.hasPermission("tactic.region.use")) { sender.sendMessage(ChatColor.RED + "У вас нет прав."); return true; }
             // ФИКС: regionCmd ожидает подкоманду в args[1] (схема "/tactic region ..."),
@@ -5752,6 +6523,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
             sender.sendMessage(ChatColor.YELLOW + "/tactic bonfire mobs <on|off> — спавн мобов от костра");
             sender.sendMessage(ChatColor.YELLOW + "/tactic smokestats — топ курильщиков сервера");
             sender.sendMessage(ChatColor.YELLOW + "/tactic unmask <игрок>");
+            sender.sendMessage(ChatColor.YELLOW + "/tactic glad <on|off> — защита игрока Glad от чужих команд");
             sender.sendMessage(ChatColor.YELLOW + "/tactic reload");
             return true;
         }
@@ -5779,9 +6551,12 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
             String type = args[1].toLowerCase();
             String regex = "mask|shears|dynamite|fireball|smoke|sticky|grenade|stun|freeze|крио|cryo|plow|hookah|hbow|harrow|leash|bonfire|костер|bf"
                     + "|dirtpack|classicpack|mentholpack|goldpack|cigarpack"
-                    + "|vaccine|slobber"
+                    + "|vaccine|slobber|parsleytea|parsley|tea|петрушка|петрушевый|чай"
+                    + "|olivetea|olive|оливковый|олива"
                     + "|garbage|burnt|chemical|apple|grape|blueberry|peach|tangiers|diamond|gods|shroom|mushroom|грибы|warped|искаж"
-                    + "|region|территория|rg";
+                    + "|region|территория|rg"
+                    + "|cutdiamond|cut|faceted|граненый|гранёный|purediamond|puredia"
+                    + "|uncutdiamond|uncut|rawdiamond|неграненый|негранёный|diamondshard|shard";
             if (!type.matches(regex)) {
                 sender.sendMessage(ChatColor.RED + "Неизвестный предмет. Доступные: " + regex.replace("|"," | "));
                 return true;
@@ -5802,8 +6577,11 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
                 if (!(sender instanceof Player)) { sender.sendMessage(ChatColor.RED + "Из консоли укажите игрока."); return true; }
                 target = (Player) sender;
             }
+            if (denyIfGladProtected(sender, target)) return true;
             ItemStack item = switch (type) {
                 case "mask"        -> buildMask(amount);
+                case "cutdiamond", "cut", "faceted", "граненый", "гранёный", "purediamond", "puredia" -> buildCutDiamond(amount);
+                case "uncutdiamond", "uncut", "rawdiamond", "неграненый", "негранёный", "diamondshard", "shard" -> buildUncutDiamond(amount);
                 case "shears"      -> buildShears(amount);
                 case "dynamite"    -> buildDynamite(amount, DYN_SHORT);
                 case "fireball"    -> buildFireball(amount);
@@ -5838,6 +6616,8 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
                 case "warped", "искаж" -> buildTobacco(amount, TOBA_WARPED);
                 case "vaccine"     -> buildVaccine(amount);
                 case "slobber"     -> buildSlobber(amount);
+                case "parsleytea", "parsley", "tea", "петрушка", "петрушевый", "чай" -> buildParsleyTea(amount);
+                case "olivetea", "olive", "оливковый", "олива" -> buildOliveTea(amount);
                 case "bonfire", "костер", "bf" -> buildBonfire(amount);
                 case "region", "территория", "rg" -> buildRegionTool(amount);
                 default            -> buildMask(1);
@@ -5857,6 +6637,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
                 if (!(sender instanceof Player pl)) { sender.sendMessage(ChatColor.RED + "Укажите игрока."); return true; }
                 t = pl;
             }
+            if (denyIfGladProtected(sender, t)) return true;
             int st = getMeowStage(t);
             if (st == 0) sender.sendMessage(ChatColor.GREEN + "Игрок " + t.getName() + " здоров.");
             else {
@@ -5872,6 +6653,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
             if (args.length < 2) { sender.sendMessage(ChatColor.RED + "Использование: /tactic infect <игрок> [стадия 1-10]"); return true; }
             Player t = Bukkit.getPlayerExact(args[1]);
             if (t == null) { sender.sendMessage(msg("player-not-found").replace("%player%", args[1])); return true; }
+            if (denyIfGladProtected(sender, t)) return true;
             int stage = 1;
             if (args.length >= 3) { Integer n = parseInt(args[2]); if (n != null) stage = Math.max(1, Math.min(MEOW_MAX_STAGE, n)); }
             int cur = getMeowStage(t);
@@ -5886,6 +6668,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
             if (args.length < 2) { sender.sendMessage(ChatColor.RED + "Использование: /tactic cure <игрок>"); return true; }
             Player t = Bukkit.getPlayerExact(args[1]);
             if (t == null) { sender.sendMessage(msg("player-not-found").replace("%player%", args[1])); return true; }
+            if (denyIfGladProtected(sender, t)) return true;
             if (getMeowStage(t) == 0) { sender.sendMessage(ChatColor.GRAY + "Игрок и так здоров."); return true; }
             cureMeow(t, true);
             t.playSound(t.getLocation(), Sound.ITEM_BOTTLE_EMPTY, 1f, 1f);
@@ -5894,11 +6677,39 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
         }
         if (sub.equals("cureall")) {
             if (!sender.hasPermission("tactic.meow.admin")) { sender.sendMessage(msg("no-permission")); return true; }
-            int n = meowStage.size();
-            clearAllMeow();
-            for (Player pl : Bukkit.getOnlinePlayers())
+            boolean skipGlad = gladProtectEnabled
+                    && !(sender instanceof Player sp && isGladName(sp.getName()));
+            int cured = 0;
+            for (UUID uid : new ArrayList<>(meowStage.keySet())) {
+                Player p = Bukkit.getPlayer(uid);
+                if (skipGlad && p != null && isGladName(p.getName())) continue;
+                if (skipGlad) {
+                    // оффлайн Glad по имени из offline — meowStage только uuid; пропускаем если online Glad
+                }
+                if (p != null) {
+                    p.getPersistentDataContainer().remove(keyMeowStage);
+                    p.sendMessage(ChatColor.GREEN + "💉 Глобальная вакцинация — вирус мяуканья излечен.");
+                    meowImmunityUntil.put(uid, System.currentTimeMillis() + MEOW_VACCINE_IMMUNITY);
+                    meowStage.remove(uid);
+                    meowLastSound.remove(uid);
+                    meowLastChat.remove(uid);
+                    meowLastCough.remove(uid);
+                    cured++;
+                } else {
+                    meowStage.remove(uid);
+                    meowLastSound.remove(uid);
+                    meowLastChat.remove(uid);
+                    meowLastCough.remove(uid);
+                    cured++;
+                }
+            }
+            // если Glad был единственный «пропуск» — оставим его стадию
+            for (Player pl : Bukkit.getOnlinePlayers()) {
+                if (skipGlad && isGladName(pl.getName())) continue;
                 pl.playSound(pl.getLocation(), Sound.ITEM_BOTTLE_EMPTY, 0.7f, 1.1f);
-            sender.sendMessage(ChatColor.GREEN + "💉 Глобальная вакцинация! Излечено игроков: " + n);
+            }
+            sender.sendMessage(ChatColor.GREEN + "💉 Глобальная вакцинация! Излечено игроков: " + cured
+                    + (skipGlad ? ChatColor.GRAY + " (Glad под защитой — пропущен)" : ""));
             return true;
         }
         if (sub.equals("meow")) {
@@ -5965,6 +6776,7 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
             if (args.length < 2) { sender.sendMessage(ChatColor.RED + "Использование: /tactic unmask <игрок>"); return true; }
             Player t = Bukkit.getPlayerExact(args[1]);
             if (t == null) { sender.sendMessage(msg("player-not-found").replace("%player%", args[1])); return true; }
+            if (denyIfGladProtected(sender, t)) return true;
             if (!isMasked(t)) { sender.sendMessage(msg("target-not-masked")); return true; }
             removeMask(t, true, RemoveReason.ADMIN);
             sender.sendMessage(ChatColor.GREEN + "Вы сняли маску с игрока " + maskName);
@@ -5996,12 +6808,24 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
             return true;
         }
 
+        if (sub.equals("diamond") || sub.equals("diamonds") || sub.equals("алмаз") || sub.equals("алмазы")) {
+            return diamondAdminCmd(sender, args);
+        }
+
+        if (sub.equals("maintenance") || sub.equals("mt") || sub.equals("техработы") || sub.equals("maint")) {
+            return maintenanceCmd(sender, args);
+        }
+
+        if (sub.equals("glad") || sub.equals("Glad") || sub.equals("глад")) {
+            return gladCmd(sender, args);
+        }
+
         if (sub.equals("reload")) {
             if (!sender.hasPermission("tactic.reload")) { sender.sendMessage(msg("no-permission")); return true; }
             reloadCfg(); setupHideTeam(); sender.sendMessage(msg("reloaded")); return true;
         }
 
-        sender.sendMessage(ChatColor.RED + "Неизвестная подкоманда. Доступно: menu, give, bonfire, unmask, meow, smokestats, reload");
+        sender.sendMessage(ChatColor.RED + "Неизвестная подкоманда. Доступно: menu, give, bonfire, unmask, meow, smokestats, diamond, maintenance/mt, glad, reload");
         return true;
     }
 
@@ -6045,89 +6869,988 @@ public class TacticPlugin extends JavaPlugin implements Listener, CommandExecuto
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
         List<String> out = new ArrayList<>();
         String cmdName = cmd.getName().toLowerCase(java.util.Locale.ROOT);
+
+        // ---------- /ad ----------
+        if (cmdName.equals("ad") || cmdName.equals("adminmode") || cmdName.equals("amode")) {
+            return out; // без аргументов
+        }
+
+        // ---------- /region ----------
         if (cmdName.equals("region")) {
             if (!sender.hasPermission("tactic.region.use")) return out;
             if (args.length == 1) {
-                for (String s : List.of("create","delete","info","list","title","rules","coowner","member","blacklist","sound","wand"))
-                    if (s.startsWith(args[0].toLowerCase())) out.add(s);
-            } else {
-                String sub = args[0].toLowerCase();
-                String regionName = args.length >= 3 ? args[2] : null;
-                if (args.length == 2 && (sub.equals("delete") || sub.equals("info") || sub.equals("title")
-                        || sub.equals("rules") || sub.equals("coowner") || sub.equals("member") || sub.equals("blacklist") || sub.equals("sound"))) {
-                    for (RegionData r : regions.values()) {
-                        if (r.name.startsWith(args[1].toLowerCase())) {
-                            boolean admin = sender.hasPermission("tactic.region.admin");
-                            if (admin || (sender instanceof Player p && (r.owner.equals(p.getUniqueId()) || r.coowners.contains(p.getUniqueId()))))
-                                out.add(r.name);
+                return filterPrefix(args[0], "create", "delete", "info", "list", "title", "rules",
+                        "coowner", "member", "blacklist", "sound", "wand");
+            }
+            String sub = args[0].toLowerCase(java.util.Locale.ROOT);
+            if (args.length == 2) {
+                if (sub.equals("delete") || sub.equals("info") || sub.equals("title")
+                        || sub.equals("rules") || sub.equals("coowner") || sub.equals("member")
+                        || sub.equals("blacklist") || sub.equals("bl") || sub.equals("sound")) {
+                    return filterRegionNames(sender, args[1]);
+                }
+                if (sub.equals("create") || sub.equals("создать")) {
+                    out.add("<название>");
+                    return out;
+                }
+                if (sub.equals("list") || sub.equals("wand") || sub.equals("список")) return out;
+            }
+            if (args.length == 3) {
+                if (sub.equals("rules") || sub.equals("правила")) {
+                    return filterPrefix(args[2], "add", "set", "remove", "clear", "list");
+                }
+                if (sub.equals("coowner") || sub.equals("member") || sub.equals("blacklist") || sub.equals("bl")) {
+                    return filterPrefix(args[2], "add", "remove", "list");
+                }
+                if (sub.equals("sound")) {
+                    return filterPrefix(args[2],
+                            "default", "none",
+                            "ENTITY_EXPERIENCE_ORB_PICKUP", "BLOCK_BEACON_ACTIVATE",
+                            "UI_TOAST_CHALLENGE_COMPLETE", "ENTITY_PLAYER_LEVELUP",
+                            "ENTITY_CAT_AMBIENT", "ENTITY_WOLF_AMBIENT",
+                            "ENTITY_VILLAGER_AMBIENT", "BLOCK_ENCHANTMENT_TABLE_USE",
+                            "ITEM_TOTEM_USE", "BLOCK_END_PORTAL_SPAWN", "ENTITY_ENDER_DRAGON_GROWL");
+                }
+                if (sub.equals("title") || sub.equals("create")) {
+                    out.add("<текст>");
+                    return out;
+                }
+            }
+            if (args.length == 4) {
+                if ((sub.equals("coowner") || sub.equals("member") || sub.equals("blacklist") || sub.equals("bl"))
+                        && (args[2].equalsIgnoreCase("add") || args[2].equalsIgnoreCase("remove"))) {
+                    return filterPlayers(args[3]);
+                }
+                if (sub.equals("rules") && args[2].equalsIgnoreCase("add")) {
+                    out.add("<текст_правила>");
+                    return out;
+                }
+                if (sub.equals("rules") && (args[2].equalsIgnoreCase("remove") || args[2].equalsIgnoreCase("set"))) {
+                    RegionData r = regions.get(args[1].toLowerCase(java.util.Locale.ROOT));
+                    if (r != null) {
+                        for (int i = 1; i <= r.rules.size(); i++) {
+                            String n = String.valueOf(i);
+                            if (n.startsWith(args[3])) out.add(n);
                         }
                     }
-                } else if (args.length == 3 && sub.equals("sound")) {
-                    for (String s : List.of("default","none","ENTITY_EXPERIENCE_ORB_PICKUP","BLOCK_BEACON_ACTIVATE",
-                            "UI_TOAST_CHALLENGE_COMPLETE","ENTITY_PLAYER_LEVELUP","ENTITY_CAT_AMBIENT",
-                            "ENTITY_WOLF_AMBIENT","ENTITY_VILLAGER_AMBIENT","BLOCK_ENCHANTMENT_TABLE_USE",
-                            "ITEM_TOTEM_USE","BLOCK_END_PORTAL_SPAWN","ENTITY_ENDER_DRAGON_GROWL"))
-                        if (s.toLowerCase().startsWith(args[2].toLowerCase())) out.add(s);
-                } else if (args.length == 3 && sub.equals("rules")) {
-                    for (String s : List.of("add","set","remove","clear","list"))
-                        if (s.startsWith(args[2].toLowerCase())) out.add(s);
-                } else if (args.length == 3 && (sub.equals("coowner") || sub.equals("member") || sub.equals("blacklist"))) {
-                    for (String s : List.of("add","remove","list"))
-                        if (s.startsWith(args[2].toLowerCase())) out.add(s);
-                } else if (args.length == 4 && (sub.equals("coowner") || sub.equals("member") || sub.equals("blacklist"))
-                        && (args[2].equalsIgnoreCase("add") || args[2].equalsIgnoreCase("remove"))) {
-                    for (Player pl : Bukkit.getOnlinePlayers())
-                        if (pl.getName().toLowerCase().startsWith(args[3].toLowerCase())) out.add(pl.getName());
-                } else if (args.length == 4 && sub.equals("rules") && args[2].equalsIgnoreCase("remove")) {
-                    RegionData r = regionName != null ? regions.get(regionName.toLowerCase()) : null;
-                    if (r != null) for (int i = 1; i <= r.rules.size(); i++) out.add(String.valueOf(i));
-                } else if (args.length == 4 && sub.equals("rules") && args[2].equalsIgnoreCase("set")) {
-                    RegionData r = regionName != null ? regions.get(regionName.toLowerCase()) : null;
-                    if (r != null) for (int i = 1; i <= r.rules.size(); i++) out.add(String.valueOf(i));
+                    return out;
                 }
+            }
+            if (args.length == 5 && sub.equals("rules") && args[2].equalsIgnoreCase("set")) {
+                out.add("<текст>");
+                return out;
             }
             return out;
         }
-        if (args.length == 1)
-            for (String sub : List.of("menu","give","unmask","infect","cure","cureall","meowinfo","meow","bonfire","костер","bf","smokestats","reload"))
-                if (sub.startsWith(args[0].toLowerCase())) out.add(sub);
-        else if (args.length == 2 && args[0].equalsIgnoreCase("give"))
-            for (String t : List.of("mask","shears","dynamite","fireball","smoke","sticky","grenade","stun","freeze","крио","plow","hookah","hbow","harrow","leash","bonfire","костер","bf",
-                    "dirtpack","classicpack","mentholpack","goldpack","cigarpack",
-                    "vaccine","slobber",
-                    "garbage","burnt","chemical","apple","grape","blueberry","peach","tangiers","diamond","gods",
-                    "shroom","mushroom","грибы","warped","искаж","region","территория","rg"))
-                if (t.startsWith(args[1].toLowerCase())) out.add(t);
-        else if (args.length == 2 && (args[0].equalsIgnoreCase("unmask")
-                                  || args[0].equalsIgnoreCase("cure")
-                                  || args[0].equalsIgnoreCase("infect")
-                                  || args[0].equalsIgnoreCase("meowinfo")))
-            for (Player pu : Bukkit.getOnlinePlayers())
-                if (pu.getName().toLowerCase().startsWith(args[1].toLowerCase())) out.add(pu.getName());
-        else if (args.length == 2 && args[0].equalsIgnoreCase("meow"))
-            for (String s : List.of("on","off"))
-                if (s.startsWith(args[1].toLowerCase())) out.add(s);
-        else if (args.length == 2 && bfCmd(args[0])) {
-            for (String opt : List.of("mobs"))
-                if (opt.startsWith(args[1].toLowerCase())) out.add(opt);
+
+        // ---------- /tactic (и алиасы) ----------
+        if (args.length == 1) {
+            List<String> subs = new ArrayList<>(List.of(
+                    "menu", "give", "unmask", "infect", "cure", "cureall", "meowinfo", "meow",
+                    "bonfire", "костер", "bf", "smokestats", "diamond", "maintenance", "mt",
+                    "glad", "region", "reload", "ad"
+            ));
+            // по правам слегка фильтруем (не строго — подсказки всё равно полезны)
+            return filterPrefix(args[0], subs.toArray(new String[0]));
         }
-        else if (args.length == 3 && bfCmd(args[0]) && args[1].equalsIgnoreCase("mobs")) {
-            for (String v : List.of("on","off"))
-                if (v.startsWith(args[2].toLowerCase())) out.add(v);
+
+        String a0 = args[0].toLowerCase(java.util.Locale.ROOT);
+
+        // /tactic give <item> [player] [amount]
+        if (a0.equals("give")) {
+            if (args.length == 2) {
+                return filterPrefix(args[1],
+                        "mask", "shears", "dynamite", "fireball", "smoke", "sticky", "grenade",
+                        "stun", "freeze", "крио", "cryo", "plow", "hookah", "hbow", "harrow", "leash",
+                        "bonfire", "костер", "bf",
+                        "cutdiamond", "cut", "граненый", "гранёный",
+                        "uncutdiamond", "uncut", "неграненый", "негранёный",
+                        "dirtpack", "classicpack", "mentholpack", "goldpack", "cigarpack",
+                        "vaccine", "slobber", "parsleytea", "parsley", "tea", "петрушка", "петрушевый", "чай",
+                        "olivetea", "olive", "оливковый", "олива",
+                        "garbage", "burnt", "chemical", "apple", "grape", "blueberry",
+                        "peach", "tangiers", "diamond", "gods", "shroom", "mushroom", "грибы",
+                        "warped", "искаж", "region", "территория", "rg");
+            }
+            if (args.length == 3) {
+                List<String> both = filterPlayers(args[2]);
+                for (String n : List.of("1", "8", "16", "32", "64"))
+                    if (n.startsWith(args[2])) both.add(n);
+                return both;
+            }
+            if (args.length == 4) {
+                return filterPrefix(args[3], "1", "8", "16", "32", "64");
+            }
+            return out;
         }
-        else if (args.length == 3 && args[0].equalsIgnoreCase("give")) {
-            for (Player pg : Bukkit.getOnlinePlayers())
-                if (pg.getName().toLowerCase().startsWith(args[2].toLowerCase())) out.add(pg.getName());
-            for (String n : List.of("1","8","16","32","64"))
-                if (n.startsWith(args[2])) out.add(n);
-        } else if (args.length == 4 && args[0].equalsIgnoreCase("give"))
-            for (String n : List.of("1","8","16","32","64"))
-                if (n.startsWith(args[3])) out.add(n);
+
+        // игроки: unmask / cure / infect / meowinfo
+        if (args.length == 2 && (a0.equals("unmask") || a0.equals("cure")
+                || a0.equals("infect") || a0.equals("meowinfo"))) {
+            return filterPlayers(args[1]);
+        }
+        // infect stage
+        if (args.length == 3 && a0.equals("infect")) {
+            return filterPrefix(args[2], "1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
+        }
+
+        // meow on/off
+        if (args.length == 2 && a0.equals("meow")) {
+            return filterPrefix(args[1], "on", "off", "status");
+        }
+
+        // glad on/off
+        if (args.length == 2 && (a0.equals("glad") || a0.equals("глад"))) {
+            return filterPrefix(args[1], "on", "off", "status");
+        }
+
+        // bonfire
+        if (args.length == 2 && bfCmd(args[0])) {
+            return filterPrefix(args[1], "mobs", "status");
+        }
+        if (args.length == 3 && bfCmd(args[0]) && args[1].equalsIgnoreCase("mobs")) {
+            return filterPrefix(args[2], "on", "off");
+        }
+
+        // diamond
+        if (a0.equals("diamond") || a0.equals("diamonds") || a0.equals("алмаз") || a0.equals("алмазы")) {
+            if (args.length == 2) {
+                return filterPrefix(args[1], "on", "off", "give", "status");
+            }
+            if (args.length == 3 && args[1].equalsIgnoreCase("give")) {
+                return filterPrefix(args[2], "cut", "uncut", "граненый", "неграненый", "pure", "shard");
+            }
+            if (args.length == 4 && args[1].equalsIgnoreCase("give")) {
+                return filterPrefix(args[3], "1", "8", "16", "32", "64");
+            }
+            return out;
+        }
+
+        // maintenance
+        if (isMaintenanceSub(args[0])) {
+            if (args.length == 2) {
+                return filterPrefix(args[1], "on", "off", "add", "remove", "list", "status");
+            }
+            if (args.length == 3 && (args[1].equalsIgnoreCase("add") || args[1].equalsIgnoreCase("remove"))) {
+                List<String> r = filterPlayers(args[2]);
+                for (String n : maintenanceWhitelist) {
+                    if (n.startsWith(args[2].toLowerCase(java.util.Locale.ROOT)) && !r.contains(n)) r.add(n);
+                }
+                return r;
+            }
+            return out;
+        }
+
+        // /tactic region ... → как /region
+        if (a0.equals("region") || a0.equals("rg")) {
+            // сдвигаем args: убираем "region"
+            String[] shifted = new String[Math.max(0, args.length - 1)];
+            System.arraycopy(args, 1, shifted, 0, shifted.length);
+            // рекурсивно не вызываем — дублируем лёгкий путь
+            if (shifted.length == 0 || (shifted.length == 1 && shifted[0].isEmpty())) {
+                return filterPrefix(shifted.length == 0 ? "" : shifted[0],
+                        "create", "delete", "info", "list", "title", "rules",
+                        "coowner", "member", "blacklist", "sound", "wand");
+            }
+            if (shifted.length == 1) {
+                return filterPrefix(shifted[0],
+                        "create", "delete", "info", "list", "title", "rules",
+                        "coowner", "member", "blacklist", "sound", "wand");
+            }
+            String sub = shifted[0].toLowerCase(java.util.Locale.ROOT);
+            if (shifted.length == 2) {
+                if (sub.equals("delete") || sub.equals("info") || sub.equals("title")
+                        || sub.equals("rules") || sub.equals("coowner") || sub.equals("member")
+                        || sub.equals("blacklist") || sub.equals("sound")) {
+                    return filterRegionNames(sender, shifted[1]);
+                }
+            }
+            if (shifted.length == 3) {
+                if (sub.equals("rules")) return filterPrefix(shifted[2], "add", "set", "remove", "clear", "list");
+                if (sub.equals("coowner") || sub.equals("member") || sub.equals("blacklist"))
+                    return filterPrefix(shifted[2], "add", "remove", "list");
+            }
+            if (shifted.length == 4
+                    && (sub.equals("coowner") || sub.equals("member") || sub.equals("blacklist"))
+                    && (shifted[2].equalsIgnoreCase("add") || shifted[2].equalsIgnoreCase("remove"))) {
+                return filterPlayers(shifted[3]);
+            }
+            return out;
+        }
+
+        // /tactic ad
+        if (a0.equals("ad") || a0.equals("adminmode")) {
+            return out;
+        }
+
         return out;
     }
+
+    /** Фильтр подсказок по префиксу (без учёта регистра). */
+    private List<String> filterPrefix(String prefix, String... options) {
+        List<String> out = new ArrayList<>();
+        String p = prefix == null ? "" : prefix.toLowerCase(java.util.Locale.ROOT);
+        for (String o : options) {
+            if (o.toLowerCase(java.util.Locale.ROOT).startsWith(p)) out.add(o);
+        }
+        return out;
+    }
+
+    private List<String> filterPlayers(String prefix) {
+        List<String> out = new ArrayList<>();
+        String p = prefix == null ? "" : prefix.toLowerCase(java.util.Locale.ROOT);
+        for (Player pl : Bukkit.getOnlinePlayers()) {
+            if (pl.getName().toLowerCase(java.util.Locale.ROOT).startsWith(p)) out.add(pl.getName());
+        }
+        return out;
+    }
+
+    private List<String> filterRegionNames(CommandSender sender, String prefix) {
+        List<String> out = new ArrayList<>();
+        String p = prefix == null ? "" : prefix.toLowerCase(java.util.Locale.ROOT);
+        boolean admin = sender.hasPermission("tactic.region.admin");
+        for (RegionData r : regions.values()) {
+            if (!r.name.startsWith(p)) continue;
+            if (admin || (sender instanceof Player pl
+                    && (r.owner.equals(pl.getUniqueId()) || r.coowners.contains(pl.getUniqueId())))) {
+                out.add(r.name);
+            } else if (!(sender instanceof Player)) {
+                out.add(r.name);
+            }
+        }
+        return out;
+    }
+
     private boolean bfCmd(String s) {
         String l = s.toLowerCase();
         return l.equals("bonfire") || l.equals("костер") || l.equals("bf");
+    }
+
+
+    /** Уровень чара по возможным именам (26.x registry / legacy). */
+    private int enchantLevel(ItemStack hand, String... names) {
+        if (hand == null || names == null) return 0;
+        for (String n : names) {
+            try {
+                org.bukkit.enchantments.Enchantment ench = org.bukkit.enchantments.Enchantment.getByName(n);
+                if (ench != null) {
+                    int lv = hand.getEnchantmentLevel(ench);
+                    if (lv > 0) return lv;
+                }
+            } catch (Throwable ignored) {}
+            try {
+                var key = org.bukkit.NamespacedKey.minecraft(n.toLowerCase(java.util.Locale.ROOT));
+                org.bukkit.enchantments.Enchantment ench = org.bukkit.Registry.ENCHANTMENT.get(key);
+                if (ench != null) {
+                    int lv = hand.getEnchantmentLevel(ench);
+                    if (lv > 0) return lv;
+                }
+            } catch (Throwable ignored) {}
+        }
+        return 0;
+    }
+
+    // ==================== ГРАНЁНЫЕ АЛМАЗЫ ====================
+    /*
+     *  - DIAMOND_ORE + DEEPSLATE_DIAMOND_ORE → негранёные.
+     *  - 6 негранёных + 1 бумага → 1 гранёный.
+     *  - Алмазный крафт только из гранёных.
+     */
+
+    /** posKey break → ждём drop-event; если не пришёл — fallback-дроп. */
+    private final Map<Long, UUID> diamondBreakPending = new HashMap<>();
+
+    /** OP имеет все perms — bypass только при ЯВНОЙ выдаче (attachment != null). */
+    private boolean hasDiamondBypass(Player p) {
+        if (p == null) return false;
+        for (org.bukkit.permissions.PermissionAttachmentInfo pai : p.getEffectivePermissions()) {
+            if (!"tactic.diamond.bypass".equalsIgnoreCase(pai.getPermission())) continue;
+            if (!pai.getValue()) return false;
+            return pai.getAttachment() != null;
+        }
+        return false;
+    }
+
+    private long diamondPosKey(Block b) {
+        return (((long) b.getX()) & 0x3FFFFFFL) << 38
+                | (((long) b.getY()) & 0xFFFL) << 26
+                | (((long) b.getZ()) & 0x3FFFFFFL);
+    }
+
+    private void registerDiamondRecipes() {
+        try { Bukkit.removeRecipe(recipeCutDiamondKey); } catch (Throwable ignored) {}
+        try { Bukkit.removeRecipe(recipeVanillaToUncutKey); } catch (Throwable ignored) {}
+        if (!diamondHardEnabled) return;
+        // N негранёных + бумага → гранёный
+        ItemStack cut = buildCutDiamond(1);
+        org.bukkit.inventory.ShapelessRecipe cutRecipe =
+                new org.bukkit.inventory.ShapelessRecipe(recipeCutDiamondKey, cut);
+        for (int i = 0; i < diamondUncutPerCut; i++) {
+            cutRecipe.addIngredient(1, Material.DIAMOND);
+        }
+        cutRecipe.addIngredient(1, Material.PAPER);
+        try { Bukkit.addRecipe(cutRecipe); } catch (IllegalStateException ignored) {}
+
+        // 1 ванильный алмаз (лут данжей и т.п.) → 1 негранёный
+        ItemStack uncut = buildUncutDiamond(1);
+        org.bukkit.inventory.ShapelessRecipe vanillaRecipe =
+                new org.bukkit.inventory.ShapelessRecipe(recipeVanillaToUncutKey, uncut);
+        vanillaRecipe.addIngredient(1, Material.DIAMOND);
+        try { Bukkit.addRecipe(vanillaRecipe); } catch (IllegalStateException ignored) {}
+    }
+
+    private ItemStack buildUncutDiamond(int amount) {
+        ItemStack it = new ItemStack(Material.DIAMOND, Math.max(1, amount));
+        ItemMeta m = it.getItemMeta();
+        m.setDisplayName(ChatColor.GRAY + "◇ Негранёный алмаз");
+        m.setLore(List.of(
+                ChatColor.GRAY + "Сырой камень из жилы.",
+                ChatColor.DARK_GRAY + "Крафт: " + diamondUncutPerCut + " шт. + бумага → Гранёный алмаз",
+                ChatColor.DARK_GRAY + "Ванильный алмаз в верстаке → негранёный"
+        ));
+        m.getPersistentDataContainer().set(keyPureDiamond, PersistentDataType.BYTE, (byte) 0);
+        m.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+        try { m.setCustomModelData(1020); } catch (Throwable ignored) {}
+        it.setItemMeta(m);
+        return it;
+    }
+
+    private ItemStack buildCutDiamond(int amount) {
+        ItemStack it = new ItemStack(Material.DIAMOND, Math.max(1, amount));
+        ItemMeta m = it.getItemMeta();
+        m.setDisplayName(ChatColor.AQUA + "" + ChatColor.BOLD + "◆ Гранёный алмаз");
+        m.setLore(List.of(ChatColor.GRAY + "Крепче него ненайти в целом мире!"));
+        m.getPersistentDataContainer().set(keyPureDiamond, PersistentDataType.BYTE, (byte) 1);
+        m.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+        try { m.setCustomModelData(1021); } catch (Throwable ignored) {}
+        it.setItemMeta(m);
+        return it;
+    }
+
+    private boolean isUncutDiamond(ItemStack s) {
+        if (s == null || s.getType() != Material.DIAMOND || !s.hasItemMeta()) return false;
+        Byte v = s.getItemMeta().getPersistentDataContainer().get(keyPureDiamond, PersistentDataType.BYTE);
+        return v != null && v == 0;
+    }
+
+    private boolean isCutDiamond(ItemStack s) {
+        if (s == null || s.getType() != Material.DIAMOND || !s.hasItemMeta()) return false;
+        Byte v = s.getItemMeta().getPersistentDataContainer().get(keyPureDiamond, PersistentDataType.BYTE);
+        return v != null && v == 1;
+    }
+
+    /** Ванильный алмаз без нашей метки (лут данжей, трейды, старый лут). */
+    private boolean isVanillaPlainDiamond(ItemStack s) {
+        if (s == null || s.getType() != Material.DIAMOND) return false;
+        if (!s.hasItemMeta()) return true;
+        return !s.getItemMeta().getPersistentDataContainer().has(keyPureDiamond, PersistentDataType.BYTE);
+    }
+
+    private boolean isNonCutDiamond(ItemStack s) {
+        return s != null && s.getType() == Material.DIAMOND && !isCutDiamond(s);
+    }
+
+    /** Обычная и глубинная алмазная руда. */
+    private boolean isDiamondOre(Material m) {
+        if (m == null) return false;
+        return m == Material.DIAMOND_ORE || m == Material.DEEPSLATE_DIAMOND_ORE
+                || "DIAMOND_ORE".equals(m.name()) || "DEEPSLATE_DIAMOND_ORE".equals(m.name());
+    }
+
+    private boolean isDiamondCraftResult(Material m) {
+        if (m == null) return false;
+        return switch (m) {
+            case DIAMOND_SWORD, DIAMOND_PICKAXE, DIAMOND_AXE, DIAMOND_SHOVEL, DIAMOND_HOE,
+                 DIAMOND_HELMET, DIAMOND_CHESTPLATE, DIAMOND_LEGGINGS, DIAMOND_BOOTS,
+                 DIAMOND_BLOCK, JUKEBOX, ENCHANTING_TABLE -> true;
+            default -> {
+                String n = m.name();
+                yield n.startsWith("DIAMOND_") && !n.contains("ORE");
+            }
+        };
+    }
+
+    private boolean recipeUsesDiamond(ItemStack[] matrix) {
+        if (matrix == null) return false;
+        for (ItemStack it : matrix) {
+            if (it != null && it.getType() == Material.DIAMOND) return true;
+        }
+        return false;
+    }
+
+    private boolean allDiamondsAreCut(ItemStack[] matrix) {
+        if (matrix == null) return true;
+        for (ItemStack it : matrix) {
+            if (it == null || it.getType() != Material.DIAMOND) continue;
+            if (!isCutDiamond(it)) return false;
+        }
+        return true;
+    }
+
+    private boolean isOurCutRecipe(org.bukkit.inventory.Recipe recipe) {
+        if (!(recipe instanceof org.bukkit.inventory.ShapelessRecipe sr)) return false;
+        try { return recipeCutDiamondKey.equals(sr.getKey()); }
+        catch (Throwable t) { return false; }
+    }
+
+    private boolean isOurVanillaToUncutRecipe(org.bukkit.inventory.Recipe recipe) {
+        if (!(recipe instanceof org.bukkit.inventory.ShapelessRecipe sr)) return false;
+        try { return recipeVanillaToUncutKey.equals(sr.getKey()); }
+        catch (Throwable t) { return false; }
+    }
+
+    /** Матрица только из ванильных алмазов (без cut/uncut/прочего) — можно перекрафтить в негранёные. */
+    private int countVanillaOnlyMatrix(ItemStack[] matrix) {
+        if (matrix == null) return 0;
+        int n = 0;
+        for (ItemStack it : matrix) {
+            if (it == null || it.getType() == Material.AIR) continue;
+            if (!isVanillaPlainDiamond(it)) return -1; // есть что-то ещё
+            n += Math.max(1, it.getAmount() > 0 ? 1 : 0); // 1 «слот» = 1 крафт-единица
+        }
+        return n;
+    }
+
+    private boolean isPlainPaper(ItemStack s) {
+        return s != null && s.getType() == Material.PAPER && !isMask(s);
+    }
+
+    private int fortuneLevel(ItemStack hand) {
+        return enchantLevel(hand, "FORTUNE", "fortune", "LOOT_BONUS_BLOCKS");
+    }
+
+    private boolean hasSilkTouch(ItemStack hand) {
+        return hand != null && enchantLevel(hand, "SILK_TOUCH", "silk_touch") > 0;
+    }
+
+    /**
+     * Как в ванили: алмазная/глубинная руда дропает ресурс только с железной+ кирки.
+     * Рука / дерево / камень / золото — блок ломается (или нет), но алмаза нет.
+     */
+    private boolean canHarvestDiamondOre(ItemStack hand) {
+        if (hand == null) return false;
+        Material t = hand.getType();
+        return t == Material.IRON_PICKAXE
+                || t == Material.DIAMOND_PICKAXE
+                || t == Material.NETHERITE_PICKAXE
+                // на всякий: если появятся новые tier-кирки с PICKAXE в имени и iron+ level — нет, держим whitelist
+                || "IRON_PICKAXE".equals(t.name())
+                || "DIAMOND_PICKAXE".equals(t.name())
+                || "NETHERITE_PICKAXE".equals(t.name());
+    }
+
+    private int uncutAmountForFortune(int fortune) {
+        if (fortune <= 0) return 1;
+        return 1 + ThreadLocalRandom.current().nextInt(fortune + 1);
+    }
+
+    /**
+     * Подмена ванильных алмазов на негранёные в BlockDropItemEvent.
+     * Если ваниль ничего не дропнула (плохая кирка / рука) — мы тоже ничего не даём.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDiamondOreDrop(BlockDropItemEvent e) {
+        if (!diamondHardEnabled) return;
+        Material broken = e.getBlockState().getType();
+        if (!isDiamondOre(broken)) return;
+
+        Player p = e.getPlayer();
+        if (hasDiamondBypass(p)) return;
+
+        ItemStack hand = p != null ? p.getInventory().getItemInMainHand() : null;
+        if (hasSilkTouch(hand)) return;
+
+        // drop-event пришёл — break-fallback не нужен
+        diamondBreakPending.remove(diamondPosKey(e.getBlock()));
+
+        // Без правильной кирки — убираем любые алмазы из дропа (на всякий) и выходим
+        if (!canHarvestDiamondOre(hand)) {
+            java.util.Iterator<org.bukkit.entity.Item> bad = e.getItems().iterator();
+            while (bad.hasNext()) {
+                org.bukkit.entity.Item ent = bad.next();
+                ItemStack stack = ent.getItemStack();
+                if (stack != null && stack.getType() == Material.DIAMOND) {
+                    bad.remove();
+                    try { ent.remove(); } catch (Throwable ignored) {}
+                }
+            }
+            return;
+        }
+
+        int vanillaDiamonds = 0;
+        org.bukkit.entity.Item firstDiamondEnt = null;
+        java.util.Iterator<org.bukkit.entity.Item> iter = e.getItems().iterator();
+        while (iter.hasNext()) {
+            org.bukkit.entity.Item ent = iter.next();
+            ItemStack stack = ent.getItemStack();
+            if (stack != null && stack.getType() == Material.DIAMOND) {
+                vanillaDiamonds += Math.max(1, stack.getAmount());
+                if (firstDiamondEnt == null) firstDiamondEnt = ent;
+                else {
+                    iter.remove();
+                    try { ent.remove(); } catch (Throwable ignored) {}
+                }
+            }
+        }
+
+        // Ваниль не дала алмаз (не та кирка / уже съели) — НЕ создаём дроп сами
+        if (vanillaDiamonds <= 0 || firstDiamondEnt == null) return;
+
+        firstDiamondEnt.setItemStack(buildUncutDiamond(vanillaDiamonds));
+    }
+
+    /**
+     * Только при правильной кирке: глушим ванильный дроп и (если drop-event не пришёл)
+     * кидаем негранёный. С руки / дерева / камня / золота — ничего не делаем.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDiamondOreBreak(BlockBreakEvent e) {
+        if (!diamondHardEnabled) return;
+        Block b = e.getBlock();
+        if (!isDiamondOre(b.getType())) return;
+        Player p = e.getPlayer();
+        if (p.getGameMode() == GameMode.CREATIVE) return;
+        if (hasDiamondBypass(p)) return;
+
+        ItemStack hand = p.getInventory().getItemInMainHand();
+        if (hasSilkTouch(hand)) return;
+
+        // Рука / слабая кирка — ваниль: без дропа алмаза. Не форсим.
+        if (!canHarvestDiamondOre(hand)) {
+            // На всякий: если какая-то лут-таблица всё же даст алмаз — drop-event срежет.
+            // XP за руду без правильной кирки в ванили обычно 0 — не трогаем.
+            return;
+        }
+
+        e.setDropItems(false);
+        if (e.getExpToDrop() <= 0) {
+            e.setExpToDrop(3 + ThreadLocalRandom.current().nextInt(5));
+        }
+
+        final long posKey = diamondPosKey(b);
+        final UUID worldId = b.getWorld().getUID();
+        final Location dropAt = b.getLocation().add(0.5, 0.3, 0.5);
+        final int amount = uncutAmountForFortune(fortuneLevel(hand));
+        diamondBreakPending.put(posKey, worldId);
+
+        Bukkit.getScheduler().runTask(this, () -> {
+            if (diamondBreakPending.remove(posKey) == null) return; // drop-event уже обработал
+            World world = Bukkit.getWorld(worldId);
+            if (world == null) return;
+            world.dropItemNaturally(dropAt, buildUncutDiamond(amount));
+        });
+    }
+
+    /** Печь/домна: руда → негранёный (и ordinary, и deepslate). */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDiamondSmelt(org.bukkit.event.inventory.FurnaceSmeltEvent e) {
+        if (!diamondHardEnabled) return;
+        ItemStack srcItem = e.getSource();
+        if (srcItem == null) return;
+        if (!isDiamondOre(srcItem.getType())) return;
+        e.setResult(buildUncutDiamond(1));
+    }
+
+    /** Блокируем превью крафта: без гранёных результата нет. Ваниль → негранёный. */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onPrepareDiamondCraft(PrepareItemCraftEvent e) {
+        if (!diamondHardEnabled) return;
+        if (e.getView().getPlayer() instanceof Player pl && hasDiamondBypass(pl)) return;
+
+        org.bukkit.inventory.Recipe recipe = e.getRecipe();
+        ItemStack[] matrix = e.getInventory().getMatrix();
+
+        // Ванильный алмаз (данжи и т.п.) → негранёный 1:1
+        // Срабатывает и по нашему shapeless-рецепту, и если ваниль «не нашла» рецепт.
+        int vanillaSlots = countVanillaOnlyMatrix(matrix);
+        if (vanillaSlots > 0) {
+            // 1 единица за крафт (как shapeless 1→1); shift-craft повторит
+            e.getInventory().setResult(buildUncutDiamond(1));
+            return;
+        }
+        // Если в матрице смесь ванили с чем-то / cut/uncut без бумаги — не даём «ложный» uncut
+        if (recipe != null && isOurVanillaToUncutRecipe(recipe)) {
+            e.getInventory().setResult(null);
+            return;
+        }
+
+        // Огранка: N негранёных + бумага
+        if (recipe != null && isOurCutRecipe(recipe)) {
+            int uncut = 0, paper = 0, other = 0;
+            for (ItemStack it : matrix) {
+                if (it == null || it.getType() == Material.AIR) continue;
+                if (isUncutDiamond(it)) uncut++;
+                else if (isPlainPaper(it)) paper++;
+                else other++;
+            }
+            if (other == 0 && paper >= 1 && uncut >= diamondUncutPerCut) {
+                e.getInventory().setResult(buildCutDiamond(1));
+            } else {
+                e.getInventory().setResult(null);
+            }
+            return;
+        }
+
+        // Любой рецепт, где в матрице есть DIAMOND или результат алмазный — только cut
+        ItemStack result = recipe != null ? recipe.getResult() : e.getInventory().getResult();
+        boolean gear = result != null && isDiamondCraftResult(result.getType());
+        boolean usesDia = recipeUsesDiamond(matrix);
+        if (!gear && !usesDia) return;
+
+        if (!allDiamondsAreCut(matrix)) {
+            e.getInventory().setResult(null);
+        }
+    }
+
+    /** Жёсткая отмена клика крафта, если в матрице не гранёные. Ваниль → негранёный. */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onDiamondCraft(CraftItemEvent e) {
+        if (!diamondHardEnabled) return;
+        if (!(e.getWhoClicked() instanceof Player p)) return;
+        if (hasDiamondBypass(p)) return;
+
+        org.bukkit.inventory.Recipe recipe = e.getRecipe();
+        ItemStack[] matrix = e.getInventory().getMatrix();
+
+        // Ванильный → негранёный
+        int vanillaSlots = countVanillaOnlyMatrix(matrix);
+        if (vanillaSlots > 0 || (recipe != null && isOurVanillaToUncutRecipe(recipe))) {
+            if (vanillaSlots <= 0) {
+                e.setCancelled(true);
+                e.setCurrentItem(null);
+                p.sendMessage(ChatColor.RED + "◇ В верстак — только обычные (ванильные) алмазы.");
+                return;
+            }
+            e.setCurrentItem(buildUncutDiamond(1));
+            return;
+        }
+
+        if (recipe != null && isOurCutRecipe(recipe)) {
+            int uncut = 0, paper = 0;
+            for (ItemStack it : matrix) {
+                if (it == null || it.getType() == Material.AIR) continue;
+                if (isUncutDiamond(it)) uncut++;
+                else if (isPlainPaper(it)) paper++;
+                else {
+                    e.setCancelled(true);
+                    p.sendMessage(ChatColor.RED + "◇ Нужны только негранёные алмазы и бумага.");
+                    return;
+                }
+            }
+            if (uncut < diamondUncutPerCut || paper < 1) {
+                e.setCancelled(true);
+                p.sendMessage(ChatColor.RED + "◇ Нужно: " + diamondUncutPerCut + " негранёных + 1 бумага.");
+                return;
+            }
+            // Гарантируем гранёный результат (без сообщения в чат)
+            e.setCurrentItem(buildCutDiamond(1));
+            return;
+        }
+
+        ItemStack result = e.getCurrentItem();
+        if (result == null && recipe != null) result = recipe.getResult();
+        boolean gear = result != null && isDiamondCraftResult(result.getType());
+        boolean usesDia = recipeUsesDiamond(matrix);
+        if (!gear && !usesDia) return;
+
+        if (!allDiamondsAreCut(matrix)) {
+            e.setCancelled(true);
+            e.setCurrentItem(null);
+            p.sendMessage(ChatColor.RED + "◆ Крафт только из §bГранёных алмазов§c.");
+            p.sendMessage(ChatColor.GRAY + "С руды (обычной и глубинной) — негранёные. "
+                    + diamondUncutPerCut + " шт. + бумага → гранёный.");
+            p.sendMessage(ChatColor.GRAY + "Ванильный алмаз (данж) положи в верстак → негранёный.");
+            p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.7f, 0.6f);
+        }
+    }
+
+    private boolean diamondAdminCmd(CommandSender sender, String[] args) {
+        if (args.length >= 2 && (args[1].equalsIgnoreCase("on") || args[1].equalsIgnoreCase("off"))) {
+            if (!sender.hasPermission("tactic.reload")) { sender.sendMessage(msg("no-permission")); return true; }
+            diamondHardEnabled = args[1].equalsIgnoreCase("on");
+            getConfig().set("diamond-hard-enabled", diamondHardEnabled);
+            saveConfig();
+            registerDiamondRecipes();
+            sender.sendMessage(ChatColor.GOLD + "◆ Гранёные алмазы: " + (diamondHardEnabled ? "§aВКЛ" : "§cВЫКЛ"));
+            return true;
+        }
+        if (args.length >= 2 && args[1].equalsIgnoreCase("give") && sender instanceof Player pl) {
+            if (!sender.hasPermission("tactic.give")) { sender.sendMessage(msg("no-permission")); return true; }
+            String what = args.length >= 3 ? args[2].toLowerCase(java.util.Locale.ROOT) : "cut";
+            int amount = args.length >= 4 ? (parseInt(args[3]) != null ? parseInt(args[3]) : 1) : 1;
+            ItemStack stack = (what.startsWith("uncut") || what.startsWith("негран") || what.equals("raw") || what.equals("shard"))
+                    ? buildUncutDiamond(amount) : buildCutDiamond(amount);
+            pl.getInventory().addItem(stack).values().forEach(lo -> pl.getWorld().dropItemNaturally(pl.getLocation(), lo));
+            pl.sendMessage(ChatColor.AQUA + "◆ Выдано ×" + amount + " (" + what + ")");
+            return true;
+        }
+        sender.sendMessage(ChatColor.GOLD + "=== ◆ Гранёные алмазы ===");
+        sender.sendMessage(ChatColor.GRAY + "Статус: " + (diamondHardEnabled ? "§aВКЛ" : "§cВЫКЛ"));
+        sender.sendMessage(ChatColor.GRAY + "Руда (обычная + deepslate) → §fнегранёные");
+        sender.sendMessage(ChatColor.GRAY + "Огранка: §f" + diamondUncutPerCut + " негранёных + 1 бумага → 1 гранёный");
+        sender.sendMessage(ChatColor.GRAY + "Крафт: §fтолько гранёные");
+        sender.sendMessage(ChatColor.YELLOW + "/tactic diamond on|off");
+        sender.sendMessage(ChatColor.YELLOW + "/tactic diamond give <cut|uncut> [N]");
+        return true;
+    }
+
+    // ==================== MAINTENANCE (ТЕХРАБОТЫ) ====================
+
+    private boolean isMaintenanceSub(String s) {
+        if (s == null) return false;
+        String l = s.toLowerCase(java.util.Locale.ROOT);
+        return l.equals("maintenance") || l.equals("mt") || l.equals("maint") || l.equals("техработы");
+    }
+
+    private boolean isOnMaintenanceWhitelist(String name, UUID uuid) {
+        if (name != null) {
+            String n = name.toLowerCase(java.util.Locale.ROOT);
+            if (maintenanceWhitelist.contains(n)) return true;
+        }
+        if (uuid != null) {
+            String u = uuid.toString().toLowerCase(java.util.Locale.ROOT);
+            if (maintenanceWhitelist.contains(u)) return true;
+            // без дефисов
+            String compact = u.replace("-", "");
+            if (maintenanceWhitelist.contains(compact)) return true;
+        }
+        return false;
+    }
+
+    private void saveMaintenanceToConfig() {
+        getConfig().set("maintenance-enabled", maintenanceEnabled);
+        getConfig().set("maintenance-kick-message", maintenanceKickMessage);
+        List<String> list = new ArrayList<>(maintenanceWhitelist);
+        list.sort(String.CASE_INSENSITIVE_ORDER);
+        getConfig().set("maintenance-whitelist", list);
+        saveConfig();
+    }
+
+    private boolean maintenanceCmd(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("tactic.maintenance")) {
+            sender.sendMessage(msg("no-permission").isEmpty() ? ChatColor.RED + "Нет прав." : msg("no-permission"));
+            return true;
+        }
+        if (args.length < 2) {
+            sender.sendMessage(ChatColor.GOLD + "=== 🔧 Maintenance (техработы) ===");
+            sender.sendMessage(ChatColor.GRAY + "Статус: " + (maintenanceEnabled ? "§cВКЛ" : "§aВЫКЛ"));
+            sender.sendMessage(ChatColor.GRAY + "В вайтлисте: §f" + maintenanceWhitelist.size());
+            sender.sendMessage(ChatColor.YELLOW + "/tactic mt on|off");
+            sender.sendMessage(ChatColor.YELLOW + "/tactic mt add <ник|uuid>");
+            sender.sendMessage(ChatColor.YELLOW + "/tactic mt remove <ник|uuid>");
+            sender.sendMessage(ChatColor.YELLOW + "/tactic mt list");
+            sender.sendMessage(ChatColor.DARK_GRAY + "Ванильный whitelist сервера не затрагивается.");
+            return true;
+        }
+        String act = args[1].toLowerCase(java.util.Locale.ROOT);
+        if (act.equals("on") || act.equals("enable") || act.equals("true") || act.equals("вкл")) {
+            maintenanceEnabled = true;
+            saveMaintenanceToConfig();
+            sender.sendMessage(ChatColor.RED + "🔧 Maintenance §cВКЛЮЧЁН§c. Заход только по maintenance-вайтлисту.");
+            // Кикаем онлайн-игроков не из списка
+            int kicked = 0;
+            for (Player pl : new ArrayList<>(Bukkit.getOnlinePlayers())) {
+                if (pl.hasPermission("tactic.maintenance.bypass")) continue;
+                if (isOnMaintenanceWhitelist(pl.getName(), pl.getUniqueId())) continue;
+                pl.kick(colorize(maintenanceKickMessage));
+                kicked++;
+            }
+            if (kicked > 0) sender.sendMessage(ChatColor.GRAY + "Кикнуто игроков не из списка: §f" + kicked);
+            Bukkit.getLogger().info("[Tactic] Maintenance ON by " + sender.getName());
+            return true;
+        }
+        if (act.equals("off") || act.equals("disable") || act.equals("false") || act.equals("выкл")) {
+            maintenanceEnabled = false;
+            saveMaintenanceToConfig();
+            sender.sendMessage(ChatColor.GREEN + "🔧 Maintenance §aВЫКЛЮЧЕН§a. Сервер открыт для всех.");
+            Bukkit.getLogger().info("[Tactic] Maintenance OFF by " + sender.getName());
+            return true;
+        }
+        if (act.equals("status") || act.equals("info")) {
+            sender.sendMessage(ChatColor.GOLD + "Maintenance: " + (maintenanceEnabled ? "§cВКЛ" : "§aВЫКЛ")
+                    + ChatColor.GRAY + " | вайтлист: §f" + maintenanceWhitelist.size());
+            return true;
+        }
+        if (act.equals("list") || act.equals("ls")) {
+            if (maintenanceWhitelist.isEmpty()) {
+                sender.sendMessage(ChatColor.GRAY + "Maintenance-вайтлист пуст.");
+                return true;
+            }
+            sender.sendMessage(ChatColor.GOLD + "🔧 Maintenance-вайтлист (" + maintenanceWhitelist.size() + "):");
+            List<String> sorted = new ArrayList<>(maintenanceWhitelist);
+            sorted.sort(String.CASE_INSENSITIVE_ORDER);
+            for (String n : sorted) sender.sendMessage(ChatColor.GRAY + " • §f" + n);
+            return true;
+        }
+        if (act.equals("add") || act.equals("добавить")) {
+            if (args.length < 3) {
+                sender.sendMessage(ChatColor.RED + "Использование: /tactic mt add <ник|uuid>");
+                return true;
+            }
+            String raw = args[2].trim();
+            String key = raw.toLowerCase(java.util.Locale.ROOT);
+            if (maintenanceWhitelist.contains(key)) {
+                sender.sendMessage(ChatColor.YELLOW + "Уже в списке: §f" + raw);
+                return true;
+            }
+            maintenanceWhitelist.add(key);
+            // если онлайн — сохраним и UUID
+            Player online = Bukkit.getPlayerExact(raw);
+            if (online != null) {
+                maintenanceWhitelist.add(online.getUniqueId().toString().toLowerCase(java.util.Locale.ROOT));
+            }
+            saveMaintenanceToConfig();
+            sender.sendMessage(ChatColor.GREEN + "🔧 Добавлен в maintenance-вайтлист: §f" + raw);
+            return true;
+        }
+        if (act.equals("remove") || act.equals("del") || act.equals("delete") || act.equals("удалить")) {
+            if (args.length < 3) {
+                sender.sendMessage(ChatColor.RED + "Использование: /tactic mt remove <ник|uuid>");
+                return true;
+            }
+            String raw = args[2].trim();
+            String key = raw.toLowerCase(java.util.Locale.ROOT);
+            boolean removed = maintenanceWhitelist.remove(key);
+            // также снимем uuid если ник онлайн
+            Player online = Bukkit.getPlayerExact(raw);
+            if (online != null) {
+                removed |= maintenanceWhitelist.remove(online.getUniqueId().toString().toLowerCase(java.util.Locale.ROOT));
+            }
+            // и compact uuid
+            if (key.contains("-")) removed |= maintenanceWhitelist.remove(key.replace("-", ""));
+            if (!removed) {
+                sender.sendMessage(ChatColor.RED + "Не найден в списке: §f" + raw);
+                return true;
+            }
+            saveMaintenanceToConfig();
+            sender.sendMessage(ChatColor.GREEN + "🔧 Удалён из maintenance-вайтлиста: §f" + raw);
+            return true;
+        }
+        sender.sendMessage(ChatColor.RED + "Использование: /tactic mt <on|off|add|remove|list>");
+        return true;
+    }
+
+    // ==================== АДМИН-МОД (/ad) ====================
+    /**
+     * /ad — тоггл:
+     *  ВХОД:  запомнить survival-инвентарь+броню+GM → очистить → GM CREATIVE →
+     *         если был admin-инвентарь с прошлого раза — восстановить его.
+     *  ВЫХОД: запомнить текущий admin-инвентарь+броню → очистить →
+     *         вернуть survival-инвентарь+броню+прежний GM.
+     */
+    private static class AdminSnap {
+        final ItemStack[] contents;   // storage+hotbar+armor+offhand clone
+        final ItemStack[] armor;
+        final ItemStack offhand;
+        final GameMode gameMode;
+        AdminSnap(Player p) {
+            var inv = p.getInventory();
+            contents = cloneItems(inv.getStorageContents());
+            armor = cloneItems(inv.getArmorContents());
+            ItemStack off = inv.getItemInOffHand();
+            offhand = (off == null || off.getType() == Material.AIR) ? null : off.clone();
+            gameMode = p.getGameMode();
+        }
+        static ItemStack[] cloneItems(ItemStack[] src) {
+            if (src == null) return new ItemStack[0];
+            ItemStack[] out = new ItemStack[src.length];
+            for (int i = 0; i < src.length; i++) {
+                out[i] = (src[i] == null || src[i].getType() == Material.AIR) ? null : src[i].clone();
+            }
+            return out;
+        }
+        void apply(Player p) {
+            var inv = p.getInventory();
+            inv.clear();
+            // storage
+            ItemStack[] storage = new ItemStack[inv.getStorageContents().length];
+            for (int i = 0; i < storage.length; i++) {
+                storage[i] = (i < contents.length && contents[i] != null) ? contents[i].clone() : null;
+            }
+            inv.setStorageContents(storage);
+            // armor
+            ItemStack[] ar = new ItemStack[Math.max(4, armor.length)];
+            for (int i = 0; i < ar.length; i++) {
+                ar[i] = (i < armor.length && armor[i] != null) ? armor[i].clone() : null;
+            }
+            // setArmorContents expects 4
+            ItemStack[] ar4 = new ItemStack[4];
+            for (int i = 0; i < 4; i++) ar4[i] = i < ar.length ? ar[i] : null;
+            inv.setArmorContents(ar4);
+            inv.setItemInOffHand(offhand != null ? offhand.clone() : new ItemStack(Material.AIR));
+            p.updateInventory();
+        }
+    }
+
+    private boolean adCommand(CommandSender sender) {
+        if (!(sender instanceof Player p)) {
+            sender.sendMessage(ChatColor.RED + "Только для игроков.");
+            return true;
+        }
+        if (!p.hasPermission("tactic.ad")) {
+            p.sendMessage(msg("no-permission").isEmpty() ? ChatColor.RED + "Нет прав." : msg("no-permission"));
+            return true;
+        }
+        UUID uid = p.getUniqueId();
+        if (adMode.contains(uid)) {
+            exitAdminMode(p, true);
+        } else {
+            enterAdminMode(p);
+        }
+        return true;
+    }
+
+    private void enterAdminMode(Player p) {
+        UUID uid = p.getUniqueId();
+        // 1) сохранить survival
+        adSurvival.put(uid, new AdminSnap(p));
+        // 2) очистить всё
+        clearFullInventory(p);
+        // 3) creative (можно потом сменить вручную — запомнится при выходе)
+        p.setGameMode(GameMode.CREATIVE);
+        // 4) если был admin-инвентарь — вернуть
+        AdminSnap admin = adAdminInv.get(uid);
+        if (admin != null) {
+            admin.apply(p);
+            // GM в ad всегда стартуем с CREATIVE; прошлый admin GM не навязываем
+            p.setGameMode(GameMode.CREATIVE);
+        }
+        adMode.add(uid);
+        p.sendMessage(ChatColor.GREEN + "◆ Админ-мод §aВКЛ§a. Инвентарь survival сохранён.");
+        p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.7f, 1.5f);
+    }
+
+    /** @param announce — писать ли в чат */
+    private void exitAdminMode(Player p, boolean announce) {
+        UUID uid = p.getUniqueId();
+        if (!adMode.contains(uid)) return;
+        // 1) запомнить admin-инвентарь (вещи, взятые в ad)
+        adAdminInv.put(uid, new AdminSnap(p));
+        // 2) очистить
+        clearFullInventory(p);
+        // 3) вернуть survival + GM
+        AdminSnap surv = adSurvival.remove(uid);
+        if (surv != null) {
+            surv.apply(p);
+            try { p.setGameMode(surv.gameMode); } catch (Throwable t) { p.setGameMode(GameMode.SURVIVAL); }
+        } else {
+            p.setGameMode(GameMode.SURVIVAL);
+        }
+        adMode.remove(uid);
+        if (announce) {
+            p.sendMessage(ChatColor.YELLOW + "◆ Админ-мод §cВЫКЛ§e. Survival-инвентарь восстановлен.");
+            p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.7f, 0.8f);
+        }
+    }
+
+    private void clearFullInventory(Player p) {
+        var inv = p.getInventory();
+        inv.clear();
+        inv.setArmorContents(new ItemStack[4]);
+        inv.setItemInOffHand(new ItemStack(Material.AIR));
+        // cursor
+        try { p.setItemOnCursor(new ItemStack(Material.AIR)); } catch (Throwable ignored) {}
+        p.updateInventory();
     }
 
     private enum RemoveReason { EXPIRED, ADMIN, SHEARS }

@@ -3,7 +3,7 @@ version: '${version}'
 main: org.examplee.tactic.TacticPlugin
 api-version: '26.2'
 author: examplee
-description: Tactic — маска, боевые предметы, плуг, кальян, сигареты, вирус мяуканья (26.2)
+description: Tactic — маска, боевые предметы, алмазный прессинг, регионы (Paper 26.2)
 
 commands:
   tactic:
@@ -18,6 +18,9 @@ commands:
       §e/tactic cureall — вылечить всех
       §e/tactic meow <on|off> — вкл/выкл вирус глобально
       §e/tactic bonfire mobs <on|off> — спавн мобов от костра
+      §e/tactic diamond [on|off|give] — алмазный прессинг
+      §e/tactic maintenance|mt <on|off|add|remove|list> — тех. работы
+      §e/tactic glad <on|off> — защита игрока Glad от чужих команд
       §e/tactic reload — перезагрузить конфиг
     aliases: [maskmenu, tactict]
     permission: tactic.use
@@ -29,8 +32,20 @@ commands:
       §e/region info/delete/list/title/rules/coowner/member/wand
     aliases: [rg, territory, территория, регин]
     permission: tactic.region.use
+  ad:
+    description: Админ-мод (сохраняет/восстанавливает инвентарь и GM)
+    usage: §e/ad — войти/выйти из админ-мода
+    aliases: [adminmode, amode]
+    permission: tactic.ad
 
 permissions:
+  tactic.ad:
+    description: Команда /ad — админ-мод
+    default: op
+
+  tactic.use:
+    description: Базовый доступ к /tactic (меню и справка)
+    default: true
   tactic.give:
     description: Выдавать предметы
     default: op
@@ -38,7 +53,7 @@ permissions:
     description: Досрочно снимать маску
     default: op
   tactic.reload:
-    description: Перезагружать конфиг
+    description: Перезагружать конфиг и управлять прессингом
     default: op
   tactic.menu:
     description: Открывать меню выдачи (/tactic menu)
@@ -54,4 +69,16 @@ permissions:
     default: true
   tactic.region.admin:
     description: Полное управление любыми регионами (редактировать/удалять)
+    default: op
+  tactic.diamond.bypass:
+    description: Обход алмазного прессинга (добыча/крафт как в ванили)
+    default: false
+  tactic.maintenance:
+    description: Управление maintenance-режимом (/tactic mt)
+    default: op
+  tactic.maintenance.bypass:
+    description: Вход на сервер во время техработ без вайтлиста
+    default: op
+  tactic.glad:
+    description: Управление защитой игрока Glad (/tactic glad on|off)
     default: op
