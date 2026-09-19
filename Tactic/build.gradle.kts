@@ -4,7 +4,7 @@ plugins {
 
 group = "org.examplee"
 version = "1.9"
-description = "Tactic — Маска, боевые предметы, кальян, ритуальный костёр с голограммой и командами (26.2)"
+description = "Tactic — маска, боевые предметы, алмазный прессинг, регионы (Paper 26.2)"
 base {
     archivesName.set("Tactic")
 }
@@ -27,13 +27,10 @@ tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
 }
 
-// Берём версию на этапе конфигурации (НЕ во время выполнения таска) — фиксит configuration-cache
 val projectVersion = version.toString()
 
 tasks.processResources {
-    // Регистрируем входное свойство (для инкрементальной сборки)
     inputs.property("pluginVersion", projectVersion)
-    // Один вызов expand() на все ресурсы — без лямбды и без обращения к project внутри
     expand("version" to projectVersion)
 }
 

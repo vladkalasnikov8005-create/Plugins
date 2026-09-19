@@ -24,6 +24,8 @@ hbow-item-model-data:     1016
 leash-item-model-data:    1017
 bonfire-item-model-data:  1018
 region-tool-model-data:   1019
+parsley-tea-item-model-data: 1020
+olive-tea-item-model-data:   1022
 
 # === Ритуальный костёр ===
 # Сколько единиц топлива сжигается за один период (по умолчанию 1)
@@ -66,6 +68,7 @@ cluster-tnt-fuse-ticks: 200        # страховочный фитиль ми�
 hookah-puffs: 5                    # тяжек на одну забивку табака
 hookah-cooldown-ticks: 30          # кулдаун между тяжками (30 = 1.5 сек)
 cig-smoke-ticks: 60                # длительность процесса курения сигареты (60 = 3 сек)
+# В пачке всегда 8 сигарет (хардкод CIG_PACK_SIZE). Курение на ходу, урон не сбрасывает.
 
 # === Передозировка никотином ===
 nicotine-window-ms: 60000          # окно подсчёта затяжек (мс)
@@ -76,6 +79,26 @@ nicotine-thresh-death: 15          # затяжек до смерти
 
 # Вирус Мяуканья: глобальный тумблер распространения и симптомов
 meow-virus-enabled: true
+
+
+# === Гранёные алмазы ===
+# false = ваниль (с руды обычные алмазы, крафт без ограничений плагина)
+diamond-hard-enabled: true
+# Сколько негранёных алмазов + 1 бумага = 1 гранёный
+diamond-uncut-per-cut: 6
+
+
+# === Maintenance (техработы) ===
+# Отдельный вайтлист: при enabled: true заходят ТОЛЬКО игроки из списка
+# (или с правом tactic.maintenance.bypass). Ванильный whitelist сервера не трогаем.
+maintenance-enabled: false
+maintenance-kick-message: "§c§lСервер на технических работах.\n§7Зайти могут только сотрудники.\n§8Попробуйте позже."
+maintenance-whitelist: []
+# Пример:
+# maintenance-whitelist:
+#   - Notch
+#   - Steve
+
 
 messages:
   mask-activated: "§aВы надели маску! Ваш ник скрыт на 30 минут."
@@ -90,3 +113,9 @@ messages:
   reloaded: "§aКонфиг перезагружен."
   shears-on-non-masked: "§eНа этом игроке нет маски."
   protected: "§cЭтого игрока невозможно разоблачить."
+
+
+# === Защита игрока Glad ===
+# true = чужие команды (любые, с ником Glad в аргументах) не действуют на Glad.
+# Сам Glad может использовать команды на себя. /tactic glad on|off
+glad-protect-enabled: false
