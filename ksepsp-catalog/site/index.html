@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KSEPSP — каталог переименований и моделей (9.5.1 vs 9.6.2)</title>
+<meta name="description" content="Полный каталог переименований ресурспака KSEPSP: все названия, модели, превью и сравнение версий 9.5.1 и 9.6.2.">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="favicon.svg">
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <a class="brand" href="#catalog">
+      <span class="brand-mark">K</span>
+      <span class="brand-text">
+        <b>KSEPSP</b>
+        <small>каталог переименований &amp; моделей</small>
+      </span>
+    </a>
+
+    <div class="ver-switch" role="group" aria-label="Версия пака">
+      <button class="ver is-active" data-ver="9.6.2">
+        <span class="dot dot-new"></span> 9.6.2 <em>новая</em>
+      </button>
+      <button class="ver" data-ver="9.5.1">
+        <span class="dot dot-old"></span> 9.5.1 <em>старая</em>
+      </button>
+    </div>
+
+    <nav class="tabs" id="tabs">
+      <button class="tab is-active" data-tab="catalog">Каталог</button>
+      <button class="tab" data-tab="diff">Сравнение <span class="badge-new" id="tab-diff-count"></span></button>
+      <button class="tab" data-tab="armor">Броня</button>
+      <button class="tab" data-tab="models">Модели</button>
+      <button class="tab" data-tab="files">Файлы</button>
+      <button class="tab" data-tab="about">О паке</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- ======================= КАТАЛОГ ======================= -->
+  <section id="panel-catalog" class="panel is-active">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <input id="q" type="search" placeholder="Поиск: название (рус/англ), предмет, путь модели…" autocomplete="off" spellcheck="false">
+        <span class="search-hint" id="q-hint"></span>
+      </div>
+      <div class="selects">
+        <label>Категория <select id="f-cat"><option value="">все</option></select></label>
+        <label>Базовый предмет <select id="f-base"><option value="">все</option></select></label>
+        <label>Порядок
+          <select id="f-sort">
+            <option value="cat">по категориям</option>
+            <option value="name">по названию (А→Я)</option>
+            <option value="name-desc">по названию (Я→А)</option>
+            <option value="base">по предмету</option>
+            <option value="new">сначала новые</option>
+          </select>
+        </label>
+      </div>
+      <div class="chips" id="quick-filters">
+        <button class="chip" data-f="all">все</button>
+        <button class="chip" data-f="added">только новые</button>
+        <button class="chip" data-f="changed">только изменённые</button>
+        <button class="chip" data-f="removed">только удалённые</button>
+        <button class="chip" data-f="renamed">другое написание</button>
+        <button class="chip" data-f="tinted">перекрашиваемые</button>
+        <button class="chip" data-f="multi">со состояниями</button>
+        <button class="chip" data-f="legacy">легаси 8.0</button>
+        <button class="chip" data-f="broken">битые текстуры</button>
+      </div>
+      <div class="toolbar-right">
+        <span class="count" id="count-line"></span>
+        <button class="btn ghost" id="export-txt" title="скачать список названий (текст)">⤓ TXT</button>
+        <button class="btn ghost" id="export-csv" title="скачать таблицу (CSV для Excel)">⤓ CSV</button>
+        <button class="btn ghost" id="reset">сбросить</button>
+      </div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+    <div class="load-more" id="load-more" hidden><button class="btn">показать ещё</button></div>
+    <div class="empty" id="empty" hidden>Ничего не найдено. Попробуйте другой запрос.</div>
+  </section>
+
+  <!-- ======================= СРАВНЕНИЕ ======================= -->
+  <section id="panel-diff" class="panel">
+    <div id="diff-summary" class="cards-row"></div>
+
+    <div class="section-head">
+      <h2>Что появилось в 9.6.2</h2>
+      <span class="muted" id="diff-added-count"></span>
+    </div>
+    <div class="grid compact" id="diff-added"></div>
+
+    <div class="section-head">
+      <h2>Что изменилось <small>(модель/текстура поменялись, название осталось)</small></h2>
+      <span class="muted" id="diff-changed-count"></span>
+    </div>
+    <div class="grid changed-grid" id="diff-changed"></div>
+
+    <div class="section-head">
+      <h2>Другое написание <small>(название то же, но в 9.6.2 пишется иначе)</small></h2>
+      <span class="muted" id="diff-renamed-count"></span>
+    </div>
+    <div class="grid changed-grid" id="diff-renamed"></div>
+
+    <div class="section-head">
+      <h2>Что пропало в 9.6.2</h2>
+      <span class="muted" id="diff-removed-count"></span>
+    </div>
+    <div class="grid compact" id="diff-removed"></div>
+
+    <div class="section-head"><h2>Новая броня (система RPT)</h2><span class="muted" id="diff-armor-count"></span></div>
+    <p class="muted note">В 9.5.1 брони по именам не было вообще: текстуры брони выдавались только легаси-системой OptiFine CIT.
+       В 9.6.2 появился новый механизм <code>assets/minecraft/rpt/swappers/**</code> (мод RPF/RPT) — 222 переименования на 94 набора текстур.</p>
+    <div class="grid compact" id="diff-armor"></div>
+  </section>
+
+  <!-- ======================= БРОНЯ ======================= -->
+  <section id="panel-armor" class="panel">
+    <div class="section-head">
+      <h2>Броня по переименованию</h2>
+      <span class="muted" id="armor-count"></span>
+    </div>
+    <div class="toolbar small">
+      <input id="a-q" type="search" placeholder="Поиск по названию брони…">
+      <div class="chips" id="a-slots"></div>
+    </div>
+    <div class="grid armor-grid" id="armor-grid"></div>
+
+    <div class="section-head"><h2>Наборы текстур брони</h2><span class="muted" id="armor-sets-count"></span></div>
+    <p class="muted note">94 папки в <code>assets/ksepsp/textures/armor/</code>. Каждый набор — это текстура(ы) слоя брони + иконка для инвентаря.</p>
+    <div class="grid sets-grid" id="armor-sets"></div>
+  </section>
+
+  <!-- ======================= МОДЕЛИ ======================= -->
+  <section id="panel-models" class="panel">
+    <div class="section-head">
+      <h2>Все модельки пака</h2>
+      <span class="muted" id="models-count"></span>
+    </div>
+    <p class="muted note">Одна строка = одна модель (путь в паке). У одной модели может быть несколько переименований сразу
+      (например, у мечей и столов). Превью — та же модель, что и на карточке.</p>
+    <div class="toolbar small">
+      <input id="m-q" type="search" placeholder="Поиск по пути модели, названию, категории…">
+      <label class="inline">Показать <select id="m-size">
+        <option value="60">60</option><option value="120" selected>120</option><option value="300">300</option>
+      </select></label>
+      <span class="count" id="m-count-line"></span>
+    </div>
+    <div class="table-wrap"><table class="models-table" id="models-table">
+      <thead><tr><th>Превью</th><th>Модель</th><th>Названия (переименования)</th><th>Предмет</th><th>Категория</th><th>Текстуры</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div class="load-more" id="m-load-more" hidden><button class="btn">показать ещё</button></div>
+  </section>
+
+  <!-- ======================= ФАЙЛЫ ======================= -->
+  <section id="panel-files" class="panel">
+    <div class="section-head"><h2>Что изменилось в файлах</h2></div>
+    <p class="muted note">Побайтовое сравнение содержимого архивов: сколько файлов добавилось / удалилось / изменилось по группам.</p>
+    <div id="files-summary" class="cards-row"></div>
+    <div class="toolbar small">
+      <div class="chips" id="files-groups"></div>
+      <div class="chips" id="files-kinds">
+        <button class="chip is-on" data-kind="added">добавлены</button>
+        <button class="chip" data-kind="changed">изменены</button>
+        <button class="chip" data-kind="removed">удалены</button>
+      </div>
+      <span class="count" id="files-count"></span>
+    </div>
+    <div class="filelist" id="files-list"></div>
+  </section>
+
+  <!-- ======================= О ПАКЕ ======================= -->
+  <section id="panel-about" class="panel">
+    <div class="about-wrap">
+      <h1>KSEPSP — что это и как этим пользоваться</h1>
+      <p class="lead">
+        KSEPSP — русскоязычный ресурспак-«переименовыватель»: множество предметов меняют модель и текстуру,
+        если предмет переименовать в наковальне. Здесь собран разбор двух версий пака —
+        <b>9.5.1</b> (старая) и <b>9.6.2</b> (новая) — со всеми названиями и превью всех моделек.
+      </p>
+
+      <h2>Как это работает</h2>
+      <ol class="steps">
+        <li>Возьмите базовый предмет (он указан у каждой карточки: например «Лук», «Железный слиток», «Тыква», «Кожаная конская броня»).</li>
+        <li>Переименуйте его в наковальне ровно в то название, которое указано на карточке — на <b>русском</b> или <b>английском</b> языке, регистр важен.</li>
+        <li>Пак подменит модель: <code>assets/minecraft/items/&lt;предмет&gt;.json</code> → условие <code>minecraft:custom_name</code> → нужная модель из <code>ksepsp:item/…</code>.</li>
+        <li>Часть предметов (<i>луки, арбалеты, удочки, подзорные трубы, тотемы</i>) имеет несколько состояний: натянутый лук, вид от первого лица, иконка в инвентаре и т. п. — они показаны в разделе «состояния» у карточки.</li>
+      </ol>
+
+      <h2>Что нового в 9.6.2 (коротко)</h2>
+      <ul class="bullets" id="about-diff"></ul>
+
+      <h2>Системы пака</h2>
+      <table class="kv">
+        <tr><th><code>assets/minecraft/items/*.json</code></th><td>Переименования предметов (1.21.4+ item model definitions). Здесь 107–108 предметов и ~2500 переименований.</td></tr>
+        <tr><th><code>assets/ksepsp/models/item/9_0</code></th><td>Актуальные модели (9-я эпоха пака): оружие, инструменты, шапки, еда, мебель, зелья.</td></tr>
+        <tr><th><code>assets/ksepsp/models/item/8_0</code></th><td>Легаси-модели прошлой эпохи: используются, чтобы старые предметы у игроков не «развалились».</td></tr>
+        <tr><th><code>assets/minecraft/rpt/swappers/**</code></th><td><b>Новое в 9.6.2.</b> Замена текстур брони по имени — механизм мода RPF/RPT (не ванильный). 284 условия, 222 уникальных названия.</td></tr>
+        <tr><th><code>assets/ksepsp/textures/armor/**</code></th><td>94 набора текстур брони + иконки инвентаря.</td></tr>
+        <tr><th><code>assets/minecraft/optifine/**</code></th><td>Старая система OptiFine CIT/CEM (эмиссивы, модели сущностей: коты, лодки, снеговик, armor stand и др.).</td></tr>
+      </table>
+
+      <h2>Версии архивов</h2>
+      <div class="cards-row" id="about-versions"></div>
+
+      <h2>Откуда данные</h2>
+      <p class="muted">
+        Всё вытащено прямо из архивов <code>KSEPSP-9-5-1.zip</code> и <code>KSEPSP-9-6-2.zip</code> (файлы этого репозитория):
+        JSON-описания моделей, текстуры и свойства. Превью отрисованы собственным рендером (модели в 3D, зерно текстуры 1:1).
+        Названия, категории и разница версий считаются автоматически — так что любую неточность легко проверить по исходному файлу пака (путь указан у каждой карточки).
+      </p>
+      <p class="muted">
+        Авторы пака: <b>Finch_94</b> и <b>Not_A_Whale</b>. Телеграм: <a href="https://t.me/ksepsp_cit" target="_blank" rel="noopener">t.me/ksepsp_cit</a>,
+        ВК: <a href="https://vk.com/ksepsp" target="_blank" rel="noopener">vk.com/ksepsp</a>.
+        Официальный список предметов пака: <a href="https://definitelyawhale.github.io/ksepsp_website/" target="_blank" rel="noopener">definitelyawhale.github.io/ksepsp_website</a>.
+      </p>
+    </div>
+  </section>
+</main>
+
+<!-- ======================= МОДАЛКА ======================= -->
+<div class="modal" id="modal" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-box" role="dialog" aria-modal="true">
+    <button class="modal-close" data-close aria-label="Закрыть">✕</button>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<footer class="foot">
+  <span>Каталог собран автоматически из архивов KSEPSP 9.5.1 и 9.6.2 · <span id="build-info"></span></span>
+</footer>
+
+<script src="viewer3d.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
