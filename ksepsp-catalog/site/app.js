@@ -615,7 +615,8 @@
       <li>Переименований: <b>${c.cases['9.5.1']} → ${c.cases['9.6.2']}</b>, уникальных моделей <b>${c.models['9.5.1']} → ${c.models['9.6.2']}</b>.</li>
       <li>Новых названий: <b id="about-new"></b>, с другими моделями: <b id="about-changed"></b>, пропало: <b id="about-removed"></b>.</li>
       <li>Появилась <b>броня по переименованию</b>: 94 набора текстур и ${c.armor['9.6.2']} названий (новый механизм RPT/RPF, не ванильный).</li>
-      <li>Текстуры: ${c.files['9.5.1']} → ${c.files['9.6.2']} файлов (+броня, +новые модели, +эмиссивы).</li>
+      <li>Файлов в паке: <b>${c.files['9.5.1']} → ${c.files['9.6.2']}</b> <span class="muted">(модели, текстуры, броня, эмиссивы)</span>.</li>
+      <li id="about-files" class="muted"></li>
       <li>Размер архива: ${fmtSize(c.size['9.5.1'])} → ${fmtSize(c.size['9.6.2'])} (без учёта сжатия zip: ${fmtSize(vOld.zip_size)} → ${fmtSize(vNew.zip_size)}).</li>`;
     fetchJSON('data/diff.json').then(dd => {
       $('#about-new').textContent = '+' + dd.counts.added;
@@ -623,6 +624,13 @@
       $('#about-removed').textContent = dd.counts.removed;
       const an = $('#about-renamed');
       if (an) an.textContent = dd.counts.renamed || 0;
+      const fl = $('#about-files');
+      if (fl && dd.files) {
+        const f = dd.files;
+        fl.innerHTML = 'По файлам: модели +' + f.models.added + '/−' + f.models.removed + ', текстуры +' + f.textures.added +
+          '/−' + f.textures.removed + ', переопределения предметов +' + f.items.added + '/~' + f.items.changed +
+          ', броня RPT +' + f.swappers.added + ', модели сущностей +' + f.cem.added + '.';
+      }
     });
   }
 
